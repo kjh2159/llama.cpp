@@ -259,12 +259,12 @@ static std::string chat_reset_and_format(struct llama_model * model, std::vector
     // chat_msgs.clear();
     chat_msgs.push_back({role, content});
     LOG_DBG("formatted: '%s'\n", formatted.c_str());
-    std::cout << "[ ";
-    for (size_t i = 0; i < chat_msgs.size(); i++) {
-        std::cout << chat_msgs[i];
-        if (i < chat_msgs.size() - 1) std::cout << ", ";
-    }
-    std::cout << " ]\n";
+    // std::cout << "[ ";
+    // for (size_t i = 0; i < chat_msgs.size(); i++) {
+    //     std::cout << chat_msgs[i];
+    //     if (i < chat_msgs.size() - 1) std::cout << ", ";
+    // }
+    // std::cout << " ]\n";
     return formatted;
 }
 
