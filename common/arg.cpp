@@ -442,7 +442,46 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
             ctx_arg.options.push_back(std::move(arg));
         }
     };
+    add_opt(common_arg(
+        {"--csv-path"}, "FNAME",
+        "path to CSV file for logging outputs (default: none)",
+        [](common_params & params, const std::string & value) {
+            params.csv_path = value;
+        }
+    ).set_examples({LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_MAIN}));
 
+    add_opt(common_arg(
+        {"--csv-limit"}, "CL",
+        "maximum number of rows to store in CSV file (default: unlimited)",
+        [](common_params & params, int value) {
+            params.csv_limit = value;
+        }
+    ).set_examples({LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_MAIN}));
+
+    add_opt(common_arg(
+        {"--device-name"}, "DN",
+        "device what to use",
+        [](common_params & params, const std::string & value) {
+            params.device_name = value;
+        }
+    ).set_examples({LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_MAIN}));
+
+    add_opt(common_arg(
+        {"--output-csv-path"}, "OC",
+        "result output csv path about prefil decode",
+        [](common_params & params, const std::string & value) {
+            params.output_csv_path = value;
+        }
+    ).set_examples({LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_MAIN}));
+
+
+   add_opt(common_arg(
+        {"--json-path"}, "JS",
+        "path of json file",
+        [](common_params & params, const std::string & value) {
+            params.json_path = value;
+        }
+    ).set_examples({LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_MAIN}));
 
     add_opt(common_arg(
         {"-h", "--help", "--usage"},

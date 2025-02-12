@@ -187,6 +187,11 @@ struct common_params_vocoder {
 };
 
 struct common_params {
+    std::string json_path;
+    std::string csv_path;    // CSV 파일 경로
+    std::string device_name;
+    std::string output_csv_path;
+    int csv_limit = 0;       // CSV 질문 개수 제한 (0이면 제한 없음)
     int32_t n_predict             =    -1; // new tokens to predict
     int32_t n_ctx                 =  4096; // context size
     int32_t n_batch               =  2048; // logical batch size for prompt processing (must be >=32 to use BLAS)

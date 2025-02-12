@@ -31,14 +31,6 @@
 #pragma warning(disable: 4244 4267) // possible loss of data
 #endif
 
-//하드웨어 관련 라이브러리
-#include "record.h"
-#include "dvfs.h"
-
-
-#include <thread>
-#include <tuple>
-
 static const char * DEFAULT_SYSTEM_MESSAGE = "You are a helpful assistant";
 
 static llama_context           ** g_ctx;
@@ -50,31 +42,6 @@ static std::ostringstream       * g_output_ss;
 static std::vector<llama_token> * g_output_tokens;
 static bool is_interacting  = false;
 static bool need_insert_eot = false;
-
-std::tuple<int, double, int, double> llama_perf_context_print_custom(const struct llama_context * ctx, const std::string & output_filename) {
-    const auto data = llama_perf_context(ctx);
-    const double t_end_ms = 1e-3 * ggml_time_us();
-
-    // ("%s:        load time = %10.2f ms\n", __func__, data.t_load_ms);
-    // ("%s: prompt eval time = %10.2f ms / %5d tokens (%8.2f ms per token, %8.2f tokens per second)\n",
-    //         __func__, data.t_p_eval_ms, data.n_p_eval, data.t_p_eval_ms / data.n_p_eval, 1e3 / data.t_p_eval_ms * data.n_p_eval);
-    // LLAMA_LOG_INFO("%s:        eval time = %10.2f ms / %5d runs   (%8.2f ms per token, %8.2f tokens per second)\n",
-    //         __func__, data.t_eval_ms, data.n_eval, data.t_eval_ms / data.n_eval, 1e3 / data.t_eval_ms * data.n_eval);
-    // LLAMA_LOG_INFO("%s:       total time = %10.2f ms / %5d tokens\n", __func__, (t_end_ms - data.t_start_ms), (data.n_p_eval + data.n_eval));
-
-    // Open the CSV file in append mode
-    std::ofstream file(output_filename, std::ios::app);
-    if (file.is_open()) {
-        file << data.n_p_eval << "," << (1e3 / data.t_p_eval_ms * data.n_p_eval) << ","
-             << data.n_eval << "," << (1e3 / data.t_eval_ms * data.n_eval) << "\n";
-        file.close();
-    } else {
-        // LLAMA_LOG_INFO("Failed to open file: %s\n", output_filename.c_str());
-    }
-
-    return std::make_tuple(data.n_p_eval, 1e3 / data.t_p_eval_ms * data.n_p_eval, data.n_eval, 1e3 / data.t_eval_ms * data.n_eval);
-}
-
 
 // 아주 단순한 방식으로 "questions.json" 파일을 파싱하는 함수.
 // JSON 파일 형식은 아래와 같이 가정합니다:
@@ -147,61 +114,6 @@ std::vector<std::string> loadQuestions(const std::string & filename) {
     return questions;
 }
 
-int check_hardware(const std::string device_name){
-    // initialization
-    // const std::string device_name = "Fold_4";
-    const DVFS dvfs(device_name);
-	
-    // get cpu freq
-    for(const auto freqs: dvfs.get_cpu_freq()){
-	std::cout << "cluster: " << freqs.first << " --- { ";
-	for (std::size_t i=0; i<freqs.second.size(); ++i){
-    	    std::cout << freqs.second[i] << " ";
-	}
-	std::cout << "}\n";
-    }
-    
-    // get ram freq
-    std::cout << "DDR Freq: { ";
-    for(const auto freq: dvfs.get_ddr_freq()){
-	std::cout << freq << " ";
-    }
-    std::cout << "}\n";
-
-	// get hard info names
-	std::string names = get_records_names(dvfs);
-	std::cout << names << std::endl;
-
-    // get hard info (without systime)
-	std::vector<std::string> o = get_hard_records(dvfs); //(not including systime)
-														 //record_hard function includes systime
-    
-	// get system time
-	auto now1 = std::chrono::system_clock::now();
-	std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-	auto now2 = std::chrono::system_clock::now();
-	auto millis = std::chrono::duration_cast<std::chrono::milliseconds>(now2-now1).count();
-
-	// get hard info with systime
-	std::cout << std::endl;
-	now1 = std::chrono::system_clock::now();
-	o = get_hard_records(dvfs);
-	now2 = std::chrono::system_clock::now();
-	millis = std::chrono::duration_cast<std::chrono::milliseconds>(now2-now1).count();
-	o.insert(o.begin(), std::to_string(millis));
-	for (std::size_t i=0; i<o.size(); ++i) std::cout << o[i] << ", ";
-	std::cout << "\n" << millis << std::endl;
-
-
-	// write hard_info file
-	bool sigterm = false;
-	record_hard(sigterm, dvfs);	
-	
-	
-	return 0;
-}
-
-
 static void print_usage(int argc, char ** argv) {
     (void) argc;
 
@@ -262,20 +174,6 @@ int main(int argc, char ** argv) {
     for (int i = 1; i < argc; i++) {
         if (std::string(argv[i]) == "--json-path" && i + 1 < argc) {
             jsonFilePath = argv[i + 1];
-        }
-    }
-    std::string device_name = ".json";
-    for (int i = 1; i < argc; i++) {
-        if (std::string(argv[i]) == "--device-name" && i + 1 < argc) {
-            device_name = argv[i + 1];
-            check_hardware(device_name);
-        }
-    }
-    std::string output_csv_path = "";
-    for (int i = 1; i < argc; i++) {
-        if (std::string(argv[i]) == "--output-csv-path" && i + 1 < argc) {
-            output_csv_path = argv[i + 1];
-            check_hardware(device_name);
         }
     }
     // --------------------------------------------------
@@ -834,10 +732,7 @@ int main(int argc, char ** argv) {
                     auto inference_duration = std::chrono::duration_cast<std::chrono::milliseconds>(inference_end_time - inference_start_time).count();
                     // LOG_INF("Inference time for previous question: %lld ms\n", inference_duration);
                     common_perf_print(ctx, smpl);
-                    if(output_csv_path!=""){
-                        llama_perf_context_print_custom(ctx, output_csv_path);
-                    }
-                    check_hardware(device_name);
+
                     // common_sampler_free(smpl);
                     inference_started = false;
                 }
@@ -858,9 +753,8 @@ int main(int argc, char ** argv) {
                 // JSON 파일(커맨드라인에서 받은 경로)에서 질문을 순차적으로 사용
                 if (current_question_index < json_questions.size()) {
                     buffer = json_questions[current_question_index++];
-                    llama_perf_context_reset(ctx);
                     LOG_INF("Using question from file: %s\n", buffer.c_str());
-                    LOG("%s\n", buffer.c_str());
+                    LOG("%s", buffer.c_str());
                     // 새 질문의 답변 추론 시작 시각 기록
                     inference_start_time = std::chrono::steady_clock::now();
                     inference_started = true;
