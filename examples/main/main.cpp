@@ -887,7 +887,7 @@ int main(int argc, char ** argv) {
                 }
                 ctx_kv_cache_clear(ctx);
                 bool format_chat = params.conversation_mode && params.enable_chat_template;
-                chat_add_and_format(model, chat_msgs, "system", params.prompt.empty() ? DEFAULT_SYSTEM_MESSAGE : params.prompt)
+                chat_add_and_format(model, chat_msgs, "system", params.prompt.empty() ? DEFAULT_SYSTEM_MESSAGE : params.prompt);
                 std::string user_inp = format_chat
                     ? chat_add_and_format(model, chat_msgs, "user", std::move(buffer))
                     : std::move(buffer);
