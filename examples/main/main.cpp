@@ -256,7 +256,7 @@ static std::string chat_add_and_format(struct llama_model * model, std::vector<c
 static std::string chat_reset_and_format(struct llama_model * model, std::vector<common_chat_msg> & chat_msgs, const std::string & role, const std::string & content) {
     common_chat_msg new_msg{role, content};
     auto formatted = common_chat_format_single(model, g_params->chat_template, chat_msgs, new_msg, role == "user");
-    chat_msgs.clear();
+    // chat_msgs.clear();
     chat_msgs.push_back({role, content});
     LOG_DBG("formatted: '%s'\n", formatted.c_str());
     return formatted;
