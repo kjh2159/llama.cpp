@@ -259,6 +259,7 @@ static std::string chat_reset_and_format(struct llama_model * model, std::vector
     // chat_msgs.clear();
     chat_msgs.push_back({role, content});
     LOG_DBG("formatted: '%s'\n", formatted.c_str());
+    std::cout << chat_msgs<<'/n';
     return formatted;
 }
 
@@ -889,7 +890,7 @@ int main(int argc, char ** argv) {
                 bool format_chat = params.conversation_mode && params.enable_chat_template;
                 chat_add_and_format(model, chat_msgs, "system", params.prompt.empty() ? DEFAULT_SYSTEM_MESSAGE : params.prompt);
                 std::string user_inp = format_chat
-                    ? chat_add_and_format(model, chat_msgs, "user", std::move(buffer))
+                    ? chat_reset_and_format(model, chat_msgs, "user", std::move(buffer))
                     : std::move(buffer);
                 std::cout << user_inp ;
                 const auto line_pfx = common_tokenize(ctx, params.input_prefix, false, true);
