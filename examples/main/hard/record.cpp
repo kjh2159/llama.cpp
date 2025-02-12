@@ -1,4 +1,5 @@
 #include "record.h"
+#include <algorithm>
 
 
 static std::vector<std::string> split_string(const std::string& str){
