@@ -51,6 +51,10 @@ static std::vector<llama_token> * g_output_tokens;
 static bool is_interacting  = false;
 static bool need_insert_eot = false;
 
+void ctx_kv_cache_clear(struct llama_context * ctx) {
+    llama_kv_cache_clear(ctx);
+}
+
 std::tuple<int, double, int, double> llama_perf_context_print_custom(const struct llama_context * ctx, const std::string & output_filename) {
     const auto data = llama_perf_context(ctx);
     const double t_end_ms = 1e-3 * ggml_time_us();
@@ -244,6 +248,15 @@ static void sigint_handler(int signo) {
 static std::string chat_add_and_format(struct llama_model * model, std::vector<common_chat_msg> & chat_msgs, const std::string & role, const std::string & content) {
     common_chat_msg new_msg{role, content};
     auto formatted = common_chat_format_single(model, g_params->chat_template, chat_msgs, new_msg, role == "user");
+    chat_msgs.push_back({role, content});
+    LOG_DBG("formatted: '%s'\n", formatted.c_str());
+    return formatted;
+}
+
+static std::string chat_reset_and_format(struct llama_model * model, std::vector<common_chat_msg> & chat_msgs, const std::string & role, const std::string & content) {
+    common_chat_msg new_msg{role, content};
+    auto formatted = common_chat_format_single(model, g_params->chat_template, chat_msgs, new_msg, role == "user");
+    chat_msgs.clear();
     chat_msgs.push_back({role, content});
     LOG_DBG("formatted: '%s'\n", formatted.c_str());
     return formatted;
@@ -872,10 +885,12 @@ int main(int argc, char ** argv) {
                 if (params.escape) {
                     string_process_escapes(buffer);
                 }
+                ctx_kv_cache_clear(ctx);
                 bool format_chat = params.conversation_mode && params.enable_chat_template;
                 std::string user_inp = format_chat
-                    ? chat_add_and_format(model, chat_msgs, "user", std::move(buffer))
+                    ? chat_reset_and_format(model, chat_msgs, "user", std::move(buffer))
                     : std::move(buffer);
+                std::cout << user_inp ;
                 const auto line_pfx = common_tokenize(ctx, params.input_prefix, false, true);
                 const auto line_inp = common_tokenize(ctx, user_inp, false, format_chat);
                 const auto line_sfx = common_tokenize(ctx, params.input_suffix, false, true);
