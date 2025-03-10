@@ -15,6 +15,7 @@ public:
     explicit Device(const std::string& device_name);
 
     const std::vector<int> get_cluster_indices() const;
+    const std::string get_device_name() const;
 };
 
 #endif // DEVICE_HPP

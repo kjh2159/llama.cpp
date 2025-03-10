@@ -131,7 +131,7 @@ int main(int argc, char ** argv) {
             std::string arg = argv[i];
             if (arg == "--csv-path") {
                 if (++i >= argc) {
-                    fprintf(stderr, "Error: missing CSV file after --csv\n");
+                    fprintf(stderr, "Error: missing CSV file after --csv-path\n");
                     return 1;
                 }
                 path_csv = argv[i];

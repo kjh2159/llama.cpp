@@ -14,9 +14,12 @@
 #include <cstdio>
 #include <memory>
 #include <chrono>
+#include <atomic>
+#include <thread>
 
-#define HARD_RECORD_FILE "/sdcard/Documents/hard_info.txt"
-
+#define HARD_RECORD_FILE "./data/hard_info_termux.txt"
+#define INFER_RECORD_FILE "./data/infer_info.csv"
+#define TIME_T std::chrono::system_clock::time_point
 
 
 // internal static functions
@@ -33,6 +36,6 @@ std::vector<std::string> get_hard_records(const DVFS& dvfs);
 // write function
 void write_file(const std::vector<std::string>& data);
 void write_file(const std::string& data);
-void record_hard(bool& sigterm, const DVFS& dvfs); // need to be implemeented
+void record_hard(std::atomic<bool>& sigterm, const DVFS& dvfs); // need to be implemeented
 
 #endif

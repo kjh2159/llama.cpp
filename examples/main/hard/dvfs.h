@@ -21,7 +21,10 @@ public:
     const std::vector<int>& get_ddr_freq() const;
 	const std::vector<std::string>& get_empty_thermal() const;
 
-	const int set_cpu_freq(std::vector<int>&);
+	int set_cpu_freq(const std::vector<int>&);
+    int unset_cpu_freq();
+    int set_ram_freq(const int freq_idx);
+    int unset_ram_freq();
 };
 
 #endif //DVFS_H

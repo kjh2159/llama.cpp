@@ -474,6 +474,21 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
         }
     ).set_examples({LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_MAIN}));
 
+    add_opt(common_arg(
+        {"--cpu-freq"}, "CF",
+        "set cpu frequency with frequency index",
+        [](common_params & params, int value) {
+            params.cpu_freq_idx = value;
+        }
+    ).set_examples({LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_MAIN}));
+
+    add_opt(common_arg(
+        {"--ram-freq"}, "RF",
+        "set ram frequency with frequency index",
+        [](common_params & params, int value) {
+            params.ram_freq_idx = value;
+        }
+    ).set_examples({LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_MAIN}));
 
    add_opt(common_arg(
         {"--json-path"}, "JS",

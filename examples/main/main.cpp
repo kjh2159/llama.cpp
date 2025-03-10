@@ -14,6 +14,8 @@
 #include <string>
 #include <vector>
 #include <chrono>   // << 추가: 고해상도 타이머 사용
+#include <future>
+#include <atomic>
 
 #if defined (__unix__) || (defined (__APPLE__) && defined (__MACH__))
 #include <signal.h>
@@ -51,6 +53,7 @@ static std::ostringstream       * g_output_ss;
 static std::vector<llama_token> * g_output_tokens;
 static bool is_interacting  = false;
 static bool need_insert_eot = false;
+std::atomic_bool sigterm(false);
 
 void ctx_kv_cache_clear(struct llama_context * ctx) {
     llama_kv_cache_clear(ctx);
@@ -123,6 +126,7 @@ std::vector<std::string> loadQuestions(const std::string &filename) {
     return questions;
 }
 
+/*
 int check_hardware(const std::string device_name){
     // initialization
     // const std::string device_name = "Fold_4";
@@ -176,6 +180,7 @@ int check_hardware(const std::string device_name){
 	
 	return 0;
 }
+*/
 
 
 static void print_usage(int argc, char ** argv) {
@@ -202,6 +207,7 @@ static bool file_is_empty(const std::string & path) {
 #if defined (__unix__) || (defined (__APPLE__) && defined (__MACH__)) || defined (_WIN32)
 static void sigint_handler(int signo) {
     if (signo == SIGINT) {
+        sigterm = true;
         if (!is_interacting && g_params->interactive) {
             is_interacting  = true;
             need_insert_eot = true;
@@ -259,17 +265,54 @@ int main(int argc, char ** argv) {
     for (int i = 1; i < argc; i++) {
         if (std::string(argv[i]) == "--device-name" && i + 1 < argc) {
             device_name = argv[i + 1];
-            check_hardware(device_name);
+            //check_hardware(device_name);
         }
     }
     std::string output_csv_path = "";
     for (int i = 1; i < argc; i++) {
         if (std::string(argv[i]) == "--output-csv-path" && i + 1 < argc) {
             output_csv_path = argv[i + 1];
-            check_hardware(device_name);
+            //check_hardware(device_name);
+        } else {
+            output_csv_path = std::string(INFER_RECORD_FILE);
         }
     }
-    // --------------------------------------------------
+
+    int cpu_freq_idx;
+    for (int i = 1; i < argc; i++) {
+        if (std::string(argv[i]) == "--cpu-freq" && i + 1 < argc) {
+            cpu_freq_idx = std::stoi(argv[i + 1]);
+            //check_hardware(device_name);
+        }
+    }
+
+    int ram_freq_idx;
+    for (int i = 1; i < argc; i++) {
+        if (std::string(argv[i]) == "--ram-freq" && i + 1 < argc) {
+            ram_freq_idx = std::stoi(argv[i + 1]);
+            //check_hardware(device_name);
+        }
+    }
+
+// --------------------------------------------------
+// 하드용 initialization
+    DVFS dvfs(device_name);
+    const std::vector<int> cpu_freq_indices = {0, cpu_freq_idx, cpu_freq_idx};
+    dvfs.set_cpu_freq(cpu_freq_indices);
+    dvfs.set_ram_freq(ram_freq_idx);
+
+// --------------------------------------------------
+
+// ----------------------------------------------------------------
+// 백그라운드 hard recording 시작
+    // clang 19.1.7 not supported
+    //std::future<void> result = std::async(std::launch::async, record_hard, sigterm, dvfs);
+    //std::packaged_task<void()> task([&dvfs] { record_hard(std::ref(sigterm), dvfs); });
+    //std::future<void> result = task.get_future();
+    //std::thread(std::move(task)).detach();
+    std::thread record_thread = std::thread(record_hard, std::ref(sigterm), dvfs);
+// ----------------------------------------------------------------
+
 
     common_init();
     auto & sparams = params.sampling;
@@ -638,6 +681,7 @@ int main(int argc, char ** argv) {
         embd_inp.push_back(decoder_start_token_id);
     }
 
+
     while ((n_remain != 0 && !is_antiprompt) || params.interactive) {
         if (!embd.empty()) {
             int max_embd_size = n_ctx - 4;
@@ -828,7 +872,7 @@ int main(int argc, char ** argv) {
                     if(output_csv_path!=""){
                         llama_perf_context_print_custom(ctx, output_csv_path);
                     }
-                    check_hardware(device_name);
+                    //check_hardware(device_name);
                     // common_sampler_free(smpl);
                     inference_started = false;
                 }
@@ -909,6 +953,12 @@ int main(int argc, char ** argv) {
         LOG("\n%s: saving final output to session file '%s'\n", __func__, path_session.c_str());
         llama_state_save_file(ctx, path_session.c_str(), session_tokens.data(), session_tokens.size());
     }
+
+    sigterm = true; // hard_record done
+    //result.get(); // wait for termination
+    dvfs.unset_cpu_freq();
+    dvfs.unset_ram_freq();
+    record_thread.join();
 
     LOG("\n\n");
     common_perf_print(ctx, smpl);
