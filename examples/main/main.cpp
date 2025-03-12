@@ -71,10 +71,15 @@ std::tuple<int, double, int, double> llama_perf_context_print_custom(const struc
     // LLAMA_LOG_INFO("%s:       total time = %10.2f ms / %5d tokens\n", __func__, (t_end_ms - data.t_start_ms), (data.n_p_eval + data.n_eval));
 
     // Open the CSV file in append mode
+    auto now1 = std::chrono::system_clock::now();
+    
+    // Convert time_point to time_t (seconds since epoch)
+    std::time_t now_c = std::chrono::system_clock::to_time_t(now1);
+    // 시스템 시간, 프리필속도, 디코드 속도, 프리필토큰수, 디코드 토큰수, ttft
     std::ofstream file(output_filename, std::ios::app);
     if (file.is_open()) {
-        file << data.n_p_eval << "," << (1e3 / data.t_p_eval_ms * data.n_p_eval) << ","
-             << data.n_eval << "," << (1e3 / data.t_eval_ms * data.n_eval) << "\n";
+        file << std::ctime(&now_c) << "," << ( 1e3 / data.t_p_eval_ms *data.n_p_eval ) << "," << (1e3 / data.t_eval_ms * data.n_eval ) << "," 
+              << data.n_p_eval << ","<< data.n_eval << "," << (data.t_p_eval_ms)<<"\n";
         file.close();
     } else {
         // LLAMA_LOG_INFO("Failed to open file: %s\n", output_filename.c_str());
@@ -272,12 +277,20 @@ int main(int argc, char ** argv) {
     for (int i = 1; i < argc; i++) {
         if (std::string(argv[i]) == "--output-csv-path" && i + 1 < argc) {
             output_csv_path = argv[i + 1];
+            break;
             //check_hardware(device_name);
         } else {
+            //시스템 시간, 프리필속도, 디코드 속도, 프리필토큰수, 디코드 토큰수, ttft
             output_csv_path = std::string(INFER_RECORD_FILE);
         }
     }
-
+    std::ofstream file(output_csv_path, std::ios::app);
+    if (file.is_open() && output_csv_path!="") {
+        file << "sys_time" << "," <<"prefil_time(token/sec)"<< "," << "decode_time(token/sec)" << "," 
+              << "prefil_tokens" << ","<< "decode_tokens" << "," << "ttft" <<"\n";
+        file.close();
+    }
+    
     int cpu_freq_idx;
     for (int i = 1; i < argc; i++) {
         if (std::string(argv[i]) == "--cpu-freq" && i + 1 < argc) {
