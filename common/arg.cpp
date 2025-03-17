@@ -467,8 +467,8 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
     ).set_examples({LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_MAIN}));
 
     add_opt(common_arg(
-        {"--output-csv-path"}, "OC",
-        "result output csv path about prefil decode",
+        {"--output-path"}, "OP",
+        "result output path for resource and inference information",
         [](common_params & params, const std::string & value) {
             params.output_csv_path = value;
         }

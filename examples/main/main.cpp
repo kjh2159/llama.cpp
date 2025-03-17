@@ -273,10 +273,17 @@ int main(int argc, char ** argv) {
             //check_hardware(device_name);
         }
     }
-    std::string output_csv_path = "";
+    std::string output_csv_path, output_txt_path;
     for (int i = 1; i < argc; i++) {
-        if (std::string(argv[i]) == "--output-csv-path" && i + 1 < argc) {
-            output_csv_path = argv[i + 1];
+        if (std::string(argv[i]) == "--output-path" && i + 1 < argc) {
+            output_csv_path = argv[i + 1]; 
+            output_txt_path = argv[i + 1];
+            size_t tmp_pos = output_csv_path.find_last_of(".");
+            if (tmp_pos!= std::string::npos) {
+                output_csv_path.insert(tmp_pos, "_infer"); 
+                output_txt_path.replace(tmp_pos, std::string::npos, "_hard.txt");
+            }
+            // ex) --output-path /abc/mypath/data.csv -> output_csv_path = "/abc/mypath/data_infer.csv"
             break;
             //check_hardware(device_name);
         } else {
@@ -310,6 +317,11 @@ int main(int argc, char ** argv) {
 // --------------------------------------------------
 // 하드용 initialization
     DVFS dvfs(device_name);
+    // set file path
+    if (output_txt_path != "") { dvfs.output_filename = output_txt_path; } 
+    else { dvfs.output_filename = std::string(HARD_RECORD_FILE); }
+    
+    // set cpu & ram freqs
     const std::vector<int> cpu_freq_indices = {0, cpu_freq_idx, cpu_freq_idx};
     dvfs.set_cpu_freq(cpu_freq_indices);
     dvfs.set_ram_freq(ram_freq_idx);

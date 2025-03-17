@@ -40,9 +40,8 @@ const std::map<std::string, std::vector<std::string>> DVFS::empty_thermal = {
 };
 
 
-
 // consturctor
-DVFS::DVFS(const std::string& device_name) : Device(device_name) {}
+DVFS::DVFS(const std::string& device_name) : Device(device_name) { output_filename = ""; }
 
 
 const std::map<int, std::vector<int>>& DVFS::get_cpu_freq() const {

@@ -232,9 +232,10 @@ std::vector<std::string> get_hard_records_wo_systime(const DVFS& dvfs){
 }
 
 
-void write_file(const std::vector<std::string>& data){
-	// open file append mode
-	std::ofstream file(HARD_RECORD_FILE, std::ios::app);
+void write_file(const std::vector<std::string>& data, std::string output){
+    
+    // open file append mode
+	std::ofstream file(output, std::ios::app);
 
 	// check file open
 	if (!file){
@@ -252,9 +253,9 @@ void write_file(const std::vector<std::string>& data){
 	file.close();
 }
 
-void write_file(const std::string& data){
+void write_file(const std::string& data, std::string output){
 	// open file append mode
-	std::ofstream file(HARD_RECORD_FILE, std::ios::app);
+	std::ofstream file(output, std::ios::app);
 
 	// check file open
 	if (!file){
@@ -281,9 +282,11 @@ void write_file(const std::string& data){
 void record_hard(std::atomic<bool>& sigterm, const DVFS& dvfs){
 
     sigterm = false;
+    std::string filename = dvfs.output_filename;
+
 
 	// insert hard names
-	write_file(get_records_names(dvfs));
+	write_file(get_records_names(dvfs), filename);
 
 	
 	int test_index = 0;
@@ -297,7 +300,7 @@ void record_hard(std::atomic<bool>& sigterm, const DVFS& dvfs){
 		records.insert(records.begin(), std::to_string(sys_time)); // insert systime into firstrecord element
 		
 		// File write record
-		write_file(records);
+		write_file(records, filename);
         // wait
         //std::this_thread::sleep_for(std::chrono::milliseconds(170));
 

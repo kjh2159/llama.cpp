@@ -36,6 +36,6 @@ std::vector<std::string> get_hard_records(const DVFS& dvfs);
 // write function
 void write_file(const std::vector<std::string>& data);
 void write_file(const std::string& data);
-void record_hard(std::atomic<bool>& sigterm, const DVFS& dvfs); // need to be implemeented
+void record_hard(std::atomic<bool>& sigterm, const DVFS& dvfs); 
 
 #endif

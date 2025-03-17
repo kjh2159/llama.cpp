@@ -15,6 +15,9 @@ private:
     static const std::map<std::string, std::vector<std::string>> empty_thermal;
 
 public:
+    std::string output_filename;
+
+public:
     explicit DVFS(const std::string& device_name);
 
     const std::map<int, std::vector<int>>& get_cpu_freq() const;
