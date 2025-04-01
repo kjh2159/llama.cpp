@@ -59,7 +59,7 @@ void ctx_kv_cache_clear(struct llama_context * ctx) {
     llama_kv_cache_clear(ctx);
 }
 
-std::tuple<int, double, int, double> llama_perf_context_print_custom(const struct llama_context * ctx, const std::string & output_filename) {
+std::tuple<int, double, int, double> llama_perf_context_print_custom(const struct llama_context * ctx, const std::string & output_filename, std::chrono::time_point<std::chrono::system_clock> start_sys_time) {
     const auto data = llama_perf_context(ctx);
     const double t_end_ms = 1e-3 * ggml_time_us();
 
@@ -71,14 +71,15 @@ std::tuple<int, double, int, double> llama_perf_context_print_custom(const struc
     // LLAMA_LOG_INFO("%s:       total time = %10.2f ms / %5d tokens\n", __func__, (t_end_ms - data.t_start_ms), (data.n_p_eval + data.n_eval));
 
     // Open the CSV file in append mode
-    auto now1 = std::chrono::system_clock::now();
+    
     
     // Convert time_point to time_t (seconds since epoch)
-    std::time_t now_c = std::chrono::system_clock::to_time_t(now1);
+    auto now_sys_time = std::chrono::system_clock::now();
+    auto sys_time = std::chrono::duration_cast<std::chrono::milliseconds>(now_sys_time-start_sys_time).count();
     // 시스템 시간, 프리필속도, 디코드 속도, 프리필토큰수, 디코드 토큰수, ttft
     std::ofstream file(output_filename, std::ios::app);
     if (file.is_open()) {
-        file << std::ctime(&now_c) << "," << ( 1e3 / data.t_p_eval_ms *data.n_p_eval ) << "," << (1e3 / data.t_eval_ms * data.n_eval ) << "," 
+        file << std::to_string(sys_time) << "," << ( 1e3 / data.t_p_eval_ms *data.n_p_eval ) << "," << (1e3 / data.t_eval_ms * data.n_eval ) << "," 
               << data.n_p_eval << ","<< data.n_eval << "," << (data.t_p_eval_ms)<<"\n";
         file.close();
     } else {
@@ -252,6 +253,7 @@ static std::string chat_reset_and_format(struct llama_model * model, std::vector
 }
 
 int main(int argc, char ** argv) {
+    auto start_sys_time = std::chrono::system_clock::now();
     common_params params;
     g_params = &params;
     if (!common_params_parse(argc, argv, params, LLAMA_EXAMPLE_MAIN, print_usage)) {
@@ -895,7 +897,7 @@ int main(int argc, char ** argv) {
                     // LOG_INF("Inference time for previous question: %lld ms\n", inference_duration);
                     common_perf_print(ctx, smpl);
                     if(output_csv_path!=""){
-                        llama_perf_context_print_custom(ctx, output_csv_path);
+                        llama_perf_context_print_custom(ctx, output_csv_path, start_sys_time);
                     }
                     //check_hardware(device_name);
                     // common_sampler_free(smpl);

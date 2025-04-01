@@ -1,0 +1,107 @@
+# ##1
+# ./build/bin/llama-cli \
+# -m /data/data/com.termux/files/home/llama.cpp-dgist/models/qwen1_5-0_5b-chat-q4_0.gguf \
+# -cnv \
+# --device-name Pixel9 \
+# --output-path ./outputs/hotpot_0_0.csv \
+# --json-path hotpot_qa_20.json \
+# --cpu-freq 0 \
+# --ram-freq 0 
+
+# sleep 900
+
+# ##2
+# ./build/bin/llama-cli \
+# -m /data/data/com.termux/files/home/llama.cpp-dgist/models/qwen1_5-0_5b-chat-q4_0.gguf \
+# -cnv \
+# --device-name Pixel9 \
+# --output-path ./outputs/hotpot_0_6.csv \
+# --json-path hotpot_qa_20.json \
+# --cpu-freq 0 \
+# --ram-freq 6 
+
+# sleep 900
+
+# ##3
+# ./build/bin/llama-cli \
+# -m /data/data/com.termux/files/home/llama.cpp-dgist/models/qwen1_5-0_5b-chat-q4_0.gguf \
+# -cnv \
+# --device-name Pixel9 \
+# --output-path ./outputs/hotpot_0_12.csv \
+# --json-path hotpot_qa_20.json \
+# --cpu-freq 0 \
+# --ram-freq 12 
+
+# sleep 900
+
+##4
+./build/bin/llama-cli \
+-m /data/data/com.termux/files/home/llama.cpp-dgist/models/qwen1_5-0_5b-chat-q4_0.gguf \
+-cnv \
+--device-name Pixel9 \
+--json-path hotpot_qa_20.json \
+--output-path ./outputs/hotpot_8_0.csv \
+--cpu-freq 8 \
+--ram-freq 0
+
+sleep 900
+
+##5
+./build/bin/llama-cli \
+-m /data/data/com.termux/files/home/llama.cpp-dgist/models/qwen1_5-0_5b-chat-q4_0.gguf \
+-cnv \
+--device-name Pixel9 \
+--json-path hotpot_qa_20.json \
+--output-path ./outputs/hotpot_8_6.csv \
+--cpu-freq 8 \
+--ram-freq 6
+
+sleep 900
+
+##6
+./build/bin/llama-cli \
+-m /data/data/com.termux/files/home/llama.cpp-dgist/models/qwen1_5-0_5b-chat-q4_0.gguf \
+-cnv \
+--device-name Pixel9 \
+--json-path hotpot_qa_20.json \
+--output-path ./outputs/hotpot_8_12.csv \
+--cpu-freq 8 \
+--ram-freq 12 
+
+sleep 900
+
+##7
+./build/bin/llama-cli \
+-m /data/data/com.termux/files/home/llama.cpp-dgist/models/qwen1_5-0_5b-chat-q4_0.gguf \
+-cnv \
+--device-name Pixel9 \
+--json-path hotpot_qa_20.json \
+--output-path ./outputs/hotpot_16_0.csv \
+--cpu-freq 16 \
+--ram-freq 0 
+
+sleep 900
+
+##8
+./build/bin/llama-cli \
+-m /data/data/com.termux/files/home/llama.cpp-dgist/models/qwen1_5-0_5b-chat-q4_0.gguf \
+-cnv \
+--device-name Pixel9 \
+--json-path hotpot_qa_20.json \
+--output-path ./outputs/hotpot_16_6.csv \
+--cpu-freq 16 \
+--ram-freq 6
+
+sleep 900
+
+##9
+./build/bin/llama-cli \
+-m /data/data/com.termux/files/home/llama.cpp-dgist/models/qwen1_5-0_5b-chat-q4_0.gguf \
+-cnv \
+-n 10 \
+--device-name Pixel9 \
+--json-path hotpot_qa_20.json \
+--output-path ./outputs/hotpot_16_12.csv \
+--cpu-freq 16 \
+--ram-freq 12
+
