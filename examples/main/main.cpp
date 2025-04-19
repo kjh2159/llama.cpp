@@ -40,7 +40,7 @@
 
 #include <thread>
 #include <tuple>
-#include <nlohmann/json.hpp> // JSON 라이브러리
+#include "json.hpp" // JSON 라이브러리
 
 static const char * DEFAULT_SYSTEM_MESSAGE = "You are a helpful assistant";
 
