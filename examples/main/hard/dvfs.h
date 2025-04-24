@@ -28,6 +28,8 @@ public:
     int unset_cpu_freq();
     int set_ram_freq(const int freq_idx);
     int unset_ram_freq();
+
+    std::vector<int> get_cpu_freqs_conf(int prime_cpu_index);
 };
 
 #endif //DVFS_H

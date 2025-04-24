@@ -324,7 +324,7 @@ int main(int argc, char ** argv) {
     else { dvfs.output_filename = std::string(HARD_RECORD_FILE); }
     
     // set cpu & ram freqs
-    const std::vector<int> cpu_freq_indices = {0, cpu_freq_idx, cpu_freq_idx};
+    const std::vector<int> cpu_freq_indices = dvfs.get_cpu_freqs_conf(cpu_freq_idx);
     dvfs.set_cpu_freq(cpu_freq_indices);
     dvfs.set_ram_freq(ram_freq_idx);
 

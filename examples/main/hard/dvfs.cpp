@@ -131,3 +131,27 @@ int DVFS::unset_ram_freq(){
 	
 	return system(command.c_str());
 }
+
+std::vector<int> DVFS::get_cpu_freqs_conf(int prime_cpu_index){
+    int prime_cluster_id = this->cluster_indices[this->cluster_indices.size()-1];
+    int max_prime_cluster_idx = this->get_cpu_freq().at(prime_cluster_id).size()-1;
+    
+    // integrity check
+    if (prime_cpu_index > max_prime_cluster_idx ){
+        std::cerr << "[WARNING] Too big prime_cpu_index: " << prime_cpu_index << " > " << max_prime_cluster_idx << std::endl;
+    }
+
+
+    // generate frequency configuration
+    std::vector<int> freq_conf = {};
+    for (auto cluster_idx : this->cluster_indices){
+        int max_idx = this->get_cpu_freq().at(cluster_idx).size()-1;
+        int idx = static_cast<int>(
+            round(((double)prime_cpu_index/(double)max_prime_cluster_idx)*(double)max_idx)
+        );
+
+        freq_conf.push_back(idx);
+    }
+
+    return freq_conf;
+}
