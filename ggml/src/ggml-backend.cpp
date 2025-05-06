@@ -1394,7 +1394,20 @@ static enum ggml_status ggml_backend_sched_compute_splits(ggml_backend_sched_t s
         }
 
         if (!sched->callback_eval) {
+            int64_t t_start = ggml_time_us();
             enum ggml_status ec = ggml_backend_graph_compute_async(split_backend, &split->graph);
+
+            int64_t t_end = ggml_time_us();
+                
+            fprintf(stderr, "[LAYER_TIMING] backend=%d took %.3f ms\n",
+                split_backend_id, (t_end - t_start) / 1000.0f);
+
+            for (int idx = 0; idx < split->graph.n_nodes; ++idx) {
+                struct ggml_tensor * node = split->graph.nodes[idx];
+                fprintf(stderr, "  └ node[%d]: %s\n", idx, node->name);
+            }
+                
+
             if (ec != GGML_STATUS_SUCCESS) {
                 return ec;
             }
@@ -1416,7 +1429,15 @@ static enum ggml_status ggml_backend_sched_compute_splits(ggml_backend_sched_t s
 
                 struct ggml_cgraph gv = ggml_graph_view(&split->graph, j0, j1 + 1);
 
+                int64_t t_start = ggml_time_us();
+
                 enum ggml_status ec = ggml_backend_graph_compute_async(split_backend, &gv);
+
+                int64_t t_end = ggml_time_us();
+                
+                fprintf(stderr, "[LAYER_TIMING] backend=%d nodes=[%d ~ %d] took %.3f ms\n",
+                    split_backend_id, j0, j1, (t_end - t_start) / 1000.0f);
+
                 if (ec != GGML_STATUS_SUCCESS) {
                     return ec;
                 }

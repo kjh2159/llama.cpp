@@ -1,3 +1,8 @@
+*.zip
+*.txt
+*.csv
+
+
 # Extensions
 
 *.a

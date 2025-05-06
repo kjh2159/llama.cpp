@@ -3,14 +3,16 @@
 -m /data/data/com.termux/files/home/llama.cpp-dgist/models/Qwen1.5-0.5B-Q4_0.gguf \
 -cnv \
 --device-name Pixel9 \
---output-path ./outputs/hotpot_0_0.csv \
+--output-path ./outputs/hotpot_6_0.csv \
 --json-path hotpot_qa_20.json \
---cpu-freq 0 \
+--cpu-freq 6 \
 --ram-freq 0 \
 -n 4096 \
 --temp 0
 
+echo hotpot_6_0
 sleep 900
+
 
 
 ##2
@@ -18,13 +20,13 @@ sleep 900
 -m /data/data/com.termux/files/home/llama.cpp-dgist/models/Qwen1.5-0.5B-Q4_0.gguf \
 -cnv \
 --device-name Pixel9 \
---output-path ./outputs/hotpot_0_4.csv \
+--output-path ./outputs/hotpot_6_4.csv \
 --json-path hotpot_qa_20.json \
---cpu-freq 0 \
+--cpu-freq 6 \
 --ram-freq 4 \
 -n 4096 \
 --temp 0
-
+echo hotpot_6_4
 sleep 900
 
 ##3
@@ -32,13 +34,13 @@ sleep 900
 -m /data/data/com.termux/files/home/llama.cpp-dgist/models/Qwen1.5-0.5B-Q4_0.gguf \
 -cnv \
 --device-name Pixel9 \
---output-path ./outputs/hotpot_0_6.csv \
+--output-path ./outputs/hotpot_6_6.csv \
 --json-path hotpot_qa_20.json \
---cpu-freq 0 \
+--cpu-freq 6 \
 --ram-freq 6 \
 -n 4096 \
 --temp 0
-
+echo hotpot_6_6
 sleep 900
 
 ##4
@@ -47,12 +49,12 @@ sleep 900
 -cnv \
 --device-name Pixel9 \
 --json-path hotpot_qa_20.json \
---output-path ./outputs/hotpot_0_9.csv \
---cpu-freq 0 \
+--output-path ./outputs/hotpot_6_9.csv \
+--cpu-freq 6 \
 --ram-freq 9 \
 -n 4096 \
 --temp 0
-
+echo hotpot_6_9
 sleep 900
 
 ##5
@@ -61,12 +63,13 @@ sleep 900
 -cnv \
 --device-name Pixel9 \
 --json-path hotpot_qa_20.json \
---output-path ./outputs/hotpot_0_10.csv \
---cpu-freq 0 \
+--output-path ./outputs/hotpot_6_10.csv \
+--cpu-freq 6 \
 --ram-freq 10 \
 -n 4096 \
 --temp 0
 
+echo hotpot_6_10
 sleep 900
 
 ##6
@@ -75,12 +78,13 @@ sleep 900
 -cnv \
 --device-name Pixel9 \
 --json-path hotpot_qa_20.json \
---output-path ./outputs/hotpot_0_11.csv \
---cpu-freq 0 \
+--output-path ./outputs/hotpot_6_11.csv \
+--cpu-freq 6 \
 --ram-freq 11\
 -n 4096 \
 --temp 0
 
+echo hotpot_6_11
 sleep 900
 
 ##7
@@ -89,11 +93,13 @@ sleep 900
 -cnv \
 --device-name Pixel9 \
 --json-path hotpot_qa_20.json \
---output-path ./outputs/hotpot_0_12.csv \
---cpu-freq 0 \
+--output-path ./outputs/hotpot_6_12.csv \
+--cpu-freq 6 \
 --ram-freq 12 \
 -n 4096 \
 --temp 0
+
+echo hotpot_6_12
 
 sleep 900
 
@@ -103,13 +109,14 @@ sleep 900
 -m /data/data/com.termux/files/home/llama.cpp-dgist/models/Qwen1.5-0.5B-Q4_0.gguf \
 -cnv \
 --device-name Pixel9 \
---output-path ./outputs/hotpot_2_0.csv \
+--output-path ./outputs/hotpot_8_0.csv \
 --json-path hotpot_qa_20.json \
---cpu-freq 2 \
+--cpu-freq 8 \
 --ram-freq 0 \
 -n 4096 \
 --temp 0
 
+echo hotpot_8_0
 sleep 900
 
 
@@ -118,13 +125,14 @@ sleep 900
 -m /data/data/com.termux/files/home/llama.cpp-dgist/models/Qwen1.5-0.5B-Q4_0.gguf \
 -cnv \
 --device-name Pixel9 \
---output-path ./outputs/hotpot_2_4.csv \
+--output-path ./outputs/hotpot_8_4.csv \
 --json-path hotpot_qa_20.json \
---cpu-freq 2 \
+--cpu-freq 8 \
 --ram-freq 4 \
 -n 4096 \
 --temp 0
 
+echo hotpot_8_4
 sleep 900
 
 ##3
@@ -132,13 +140,14 @@ sleep 900
 -m /data/data/com.termux/files/home/llama.cpp-dgist/models/Qwen1.5-0.5B-Q4_0.gguf \
 -cnv \
 --device-name Pixel9 \
---output-path ./outputs/hotpot_2_6.csv \
+--output-path ./outputs/hotpot_8_6.csv \
 --json-path hotpot_qa_20.json \
---cpu-freq 2 \
+--cpu-freq 8 \
 --ram-freq 6 \
 -n 4096 \
 --temp 0
 
+echo hotpot_8_6
 sleep 900
 
 ##4
@@ -147,12 +156,13 @@ sleep 900
 -cnv \
 --device-name Pixel9 \
 --json-path hotpot_qa_20.json \
---output-path ./outputs/hotpot_2_9.csv \
---cpu-freq 2 \
+--output-path ./outputs/hotpot_8_9.csv \
+--cpu-freq 8 \
 --ram-freq 9 \
 -n 4096 \
 --temp 0
 
+echo hotpot_8_9
 sleep 900
 
 ##5
@@ -161,12 +171,13 @@ sleep 900
 -cnv \
 --device-name Pixel9 \
 --json-path hotpot_qa_20.json \
---output-path ./outputs/hotpot_2_10.csv \
---cpu-freq 2 \
+--output-path ./outputs/hotpot_8_10.csv \
+--cpu-freq 8 \
 --ram-freq 10 \
 -n 4096 \
 --temp 0
 
+echo hotpot_8_10
 sleep 900
 
 ##6
@@ -175,12 +186,13 @@ sleep 900
 -cnv \
 --device-name Pixel9 \
 --json-path hotpot_qa_20.json \
---output-path ./outputs/hotpot_2_11.csv \
---cpu-freq 2 \
+--output-path ./outputs/hotpot_8_11.csv \
+--cpu-freq 8 \
 --ram-freq 11\
 -n 4096 \
 --temp 0
 
+echo hotpot_8_11
 sleep 900
 
 ##7
@@ -189,9 +201,10 @@ sleep 900
 -cnv \
 --device-name Pixel9 \
 --json-path hotpot_qa_20.json \
---output-path ./outputs/hotpot_2_12.csv \
---cpu-freq 2 \
+--output-path ./outputs/hotpot_8_12.csv \
+--cpu-freq 8 \
 --ram-freq 12 \
 -n 4096 \
 --temp 0
+echo hotpot_8_12
 
