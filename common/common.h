@@ -194,6 +194,7 @@ struct common_params {
     int csv_limit = 0;       // CSV 질문 개수 제한 (0이면 제한 없음)
     int cpu_freq_idx = 0;
     int ram_freq_idx = 0;
+    int dp_itvl=0;
 
     int32_t n_predict             =    -1; // new tokens to predict
     int32_t n_ctx                 =  4096; // context size

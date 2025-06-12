@@ -6,8 +6,7 @@
 --output-path ./outputs/hotpot_0_0 \
 --json-path hotpot_qa_30.json \
 --cpu-freq 0 \
---ram-freq 0 \
--
+--ram-freq 0 
 
 sleep 1800
 
