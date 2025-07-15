@@ -293,14 +293,13 @@ int main(int argc, char ** argv) {
             output_csv_path = std::string(INFER_RECORD_FILE);
         }
     }
-    
-    // double dp_itvl = 0.0;  // 기본값 설정
-    // for (int i = 1; i < argc; i++) {
-    //     if (std::string(argv[i]) == "--dp-itvl" && i + 1 < argc) {
-    //         dp_itvl =  std::stod(argv[i + 1]) / 1000.0;
-    //     }
-    // }
+    double dp_itvl = 0.0;  // 기본값 설정
 
+    for (int i = 1; i < argc; i++) {
+        if (std::string(argv[i]) == "--dp-itvl" && i + 1 < argc) {
+            dp_itvl =  std::stod(argv[i + 1]) / 1000.0;
+        }
+    }
     std::ofstream file(output_csv_path, std::ios::app);
     if (file.is_open() && output_csv_path!="") {
         file << "sys_time" << "," <<"prefil_time(token/sec)"<< "," << "decode_time(token/sec)" << "," 
@@ -833,7 +832,7 @@ int main(int argc, char ** argv) {
         if (input_echo && display) {
             for (auto id : embd) {
                 const std::string token_str = common_token_to_piece(ctx, id, params.special);
-                //std::this_thread::sleep_for(std::chrono::duration<double>(dp_itvl));
+                std::this_thread::sleep_for(std::chrono::duration<double>(dp_itvl));
                 LOG("%s", token_str.c_str());
                 if (embd.size() > 1) {
                     input_tokens.push_back(id);
