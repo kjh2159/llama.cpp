@@ -141,6 +141,7 @@ poetry.toml
 
 # Scripts
 !/scripts/install-oneapi.bat
+!/scripts/build.sh
 
 # Test models for lora adapters
 /lora-tests
