@@ -6,6 +6,7 @@
 #include <stdlib.h>
 
 #include <map>
+#include <cmath>
 
 
 class DVFS : public Device {

@@ -34,8 +34,8 @@
 #endif
 
 //하드웨어 관련 라이브러리
-#include "record.h"
-#include "dvfs.h"
+#include "hard/record.h"
+#include "hard/dvfs.h"
 
 
 #include <thread>

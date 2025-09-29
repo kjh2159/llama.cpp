@@ -61,7 +61,7 @@ int DVFS::set_cpu_freq(const std::vector<int>& freq_indices){
 
     // set cpu frequency
 	std::string command = "su -c \"";
-	for (int i=0; i<this->cluster_indices.size(); ++i){ 
+	for (int i=0; i<(int)(this->cluster_indices.size()); ++i){ 
 		int idx = this->cluster_indices[i];
         int freq_idx = freq_indices[i];
 		int clk = this->cpufreq.at(this->device).at(idx)[freq_idx];
@@ -76,7 +76,7 @@ int DVFS::set_cpu_freq(const std::vector<int>& freq_indices){
 int DVFS::unset_cpu_freq(){
     // set cpu frequency
 	std::string command = "su -c \"";
-	for (int i=0; i<this->cluster_indices.size(); ++i){ 
+	for (int i=0; i<(int)(this->cluster_indices.size()); ++i){ 
 		int idx = this->cluster_indices[i]; //freq_indices[i];
         int min_clk = this->cpufreq.at(this->device).at(idx)[0];
         int max_clk = this->cpufreq.at(this->device).at(idx)[this->cpufreq.at(this->device).at(idx).size()-1];
@@ -91,7 +91,7 @@ int DVFS::unset_cpu_freq(){
 
 int DVFS::set_ram_freq(const int freq_idx){
 	// vector size should be same
-	if (this->get_ddr_freq().size() <= freq_idx) return 1;
+	if ((int)(this->get_ddr_freq().size()) <= freq_idx) return 1;
 
     // set ram frequency
     const int clk = this->get_ddr_freq()[freq_idx];
@@ -147,7 +147,7 @@ std::vector<int> DVFS::get_cpu_freqs_conf(int prime_cpu_index){
     for (auto cluster_idx : this->cluster_indices){
         int max_idx = this->get_cpu_freq().at(cluster_idx).size()-1;
         int idx = static_cast<int>(
-            round(((double)prime_cpu_index/(double)max_prime_cluster_idx)*(double)max_idx)
+            std::round(((double)prime_cpu_index/(double)max_prime_cluster_idx)*(double)max_idx)
         );
 
         freq_conf.push_back(idx);

@@ -29,10 +29,24 @@ add_library(llama
             unicode-data.cpp
             )
 
+add_library(ignite
+            hard/device.h
+            hard/device.cpp
+            hard/dvfs.h
+            hard/dvfs.cpp
+            hard/record.h
+            hard/record.cpp
+            hard/utils.h
+            hard/utils.cpp
+            )
+
 target_include_directories(llama PUBLIC . ../include)
 target_compile_features   (llama PUBLIC cxx_std_17) # don't bump
-
 target_link_libraries(llama PUBLIC ggml)
+
+target_include_directories(ignite PUBLIC . .)
+target_compile_features   (ignite PUBLIC cxx_std_17) # don't bump
+target_link_libraries(ignite PUBLIC ggml)
 
 if (BUILD_SHARED_LIBS)
     set_target_properties(llama PROPERTIES POSITION_INDEPENDENT_CODE ON)
