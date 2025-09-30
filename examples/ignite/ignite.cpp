@@ -14,6 +14,8 @@
 #include <string>
 #include <vector>
 #include <chrono>   // << 추가: 고해상도 타이머 사용
+#include <future>
+#include <atomic>
 
 #if defined (__unix__) || (defined (__APPLE__) && defined (__MACH__))
 #include <signal.h>
@@ -31,6 +33,15 @@
 #pragma warning(disable: 4244 4267) // possible loss of data
 #endif
 
+//하드웨어 관련 라이브러리
+#include "hard/record.h"
+#include "hard/dvfs.h"
+
+
+#include <thread>
+#include <tuple>
+#include "json.hpp" // JSON 라이브러리
+
 static const char * DEFAULT_SYSTEM_MESSAGE = "You are a helpful assistant";
 
 static llama_context           ** g_ctx;
@@ -42,6 +53,42 @@ static std::ostringstream       * g_output_ss;
 static std::vector<llama_token> * g_output_tokens;
 static bool is_interacting  = false;
 static bool need_insert_eot = false;
+std::atomic_bool sigterm(false);
+
+void ctx_kv_cache_clear(struct llama_context * ctx) {
+    llama_kv_cache_clear(ctx);
+}
+
+std::tuple<int, double, int, double> llama_perf_context_print_custom(const struct llama_context * ctx, const std::string & output_filename, std::chrono::time_point<std::chrono::system_clock> start_sys_time) {
+    const auto data = llama_perf_context(ctx);
+    const double t_end_ms = 1e-3 * ggml_time_us();
+
+    // ("%s:        load time = %10.2f ms\n", __func__, data.t_load_ms);
+    // ("%s: prompt eval time = %10.2f ms / %5d tokens (%8.2f ms per token, %8.2f tokens per second)\n",
+    //         __func__, data.t_p_eval_ms, data.n_p_eval, data.t_p_eval_ms / data.n_p_eval, 1e3 / data.t_p_eval_ms * data.n_p_eval);
+    // LLAMA_LOG_INFO("%s:        eval time = %10.2f ms / %5d runs   (%8.2f ms per token, %8.2f tokens per second)\n",
+    //         __func__, data.t_eval_ms, data.n_eval, data.t_eval_ms / data.n_eval, 1e3 / data.t_eval_ms * data.n_eval);
+    // LLAMA_LOG_INFO("%s:       total time = %10.2f ms / %5d tokens\n", __func__, (t_end_ms - data.t_start_ms), (data.n_p_eval + data.n_eval));
+
+    // Open the CSV file in append mode
+    
+    
+    // Convert time_point to time_t (seconds since epoch)
+    auto now_sys_time = std::chrono::system_clock::now();
+    auto sys_time = std::chrono::duration_cast<std::chrono::milliseconds>(now_sys_time-start_sys_time).count();
+    // 시스템 시간, 프리필속도, 디코드 속도, 프리필토큰수, 디코드 토큰수, ttft
+    std::ofstream file(output_filename, std::ios::app);
+    if (file.is_open()) {
+        file << std::to_string(sys_time) << "," << ( 1e3 / data.t_p_eval_ms *data.n_p_eval ) << "," << (1e3 / data.t_eval_ms * data.n_eval ) << "," 
+              << data.n_p_eval << ","<< data.n_eval << "," << (data.t_p_eval_ms)<<"\n";
+        file.close();
+    } else {
+        // LLAMA_LOG_INFO("Failed to open file: %s\n", output_filename.c_str());
+    }
+
+    return std::make_tuple(data.n_p_eval, 1e3 / data.t_p_eval_ms * data.n_p_eval, data.n_eval, 1e3 / data.t_eval_ms * data.n_eval);
+}
+
 
 // 아주 단순한 방식으로 "questions.json" 파일을 파싱하는 함수.
 // JSON 파일 형식은 아래와 같이 가정합니다:
@@ -52,67 +99,95 @@ static bool need_insert_eot = false;
 //     "세 번째 질문 내용"
 //   ]
 // }
-std::vector<std::string> loadQuestions(const std::string & filename) {
+
+
+using json = nlohmann::json;
+
+std::vector<std::string> loadQuestions(const std::string &filename) {
     std::vector<std::string> questions;
     std::ifstream file(filename);
+    
     if (!file) {
-        LOG_ERR("Failed to open %s. Exiting.\n", filename.c_str());
+        std::cerr << "Failed to open " << filename << ". Exiting.\n";
         return questions;
     }
-    std::stringstream buffer;
-    buffer << file.rdbuf();
-    std::string content = buffer.str();
 
-    // "questions" 키를 찾음
-    size_t pos = content.find("\"questions\"");
-    if (pos == std::string::npos) {
-        LOG_ERR("Could not find \"questions\" key in %s. Exiting.\n", filename.c_str());
-        return questions;
-    }
-    // 첫 번째 '[' 찾기
-    pos = content.find('[', pos);
-    if (pos == std::string::npos) {
-        LOG_ERR("Could not find '[' in %s. Exiting.\n", filename.c_str());
-        return questions;
-    }
-    // 대응하는 ']' 찾기
-    size_t endPos = content.find(']', pos);
-    if (endPos == std::string::npos) {
-        LOG_ERR("Could not find ']' in %s. Exiting.\n", filename.c_str());
-        return questions;
-    }
-    // '['와 ']' 사이의 내용을 추출
-    std::string arrayContent = content.substr(pos + 1, endPos - pos - 1);
+    try {
+        json jsonData;
+        file >> jsonData; // JSON 파싱
 
-    // 쉼표(,)로 분리 (각 항목은 큰따옴표로 감싸진 문자열)
-    size_t start = 0;
-    while (true) {
-        size_t commaPos = arrayContent.find(',', start);
-        std::string token;
-        if (commaPos == std::string::npos) {
-            token = arrayContent.substr(start);
+        if (jsonData.contains("questions") && jsonData["questions"].is_array()) {
+            for (const auto& item : jsonData["questions"]) {
+                if (item.is_string()) {
+                    questions.push_back(item.get<std::string>());
+                }
+            }
         } else {
-            token = arrayContent.substr(start, commaPos - start);
+            std::cerr << "Invalid JSON format: 'data' key missing or not an array\n";
         }
-        // 공백 문자 제거
-        size_t first = token.find_first_not_of(" \t\n\r");
-        size_t last = token.find_last_not_of(" \t\n\r");
-        if (first != std::string::npos && last != std::string::npos) {
-            token = token.substr(first, last - first + 1);
-        }
-        // 앞뒤에 큰따옴표(")가 있으면 제거
-        if (token.size() >= 2 && token.front() == '\"' && token.back() == '\"') {
-            token = token.substr(1, token.size() - 2);
-        }
-        if (!token.empty()) {
-            questions.push_back(token);
-        }
-        if (commaPos == std::string::npos)
-            break;
-        start = commaPos + 1;
+    } catch (const std::exception &e) {
+        std::cerr << "JSON parsing error: " << e.what() << "\n";
     }
+
     return questions;
 }
+
+/*
+int check_hardware(const std::string device_name){
+    // initialization
+    // const std::string device_name = "Fold_4";
+    const DVFS dvfs(device_name);
+	
+    // get cpu freq
+    for(const auto freqs: dvfs.get_cpu_freq()){
+	std::cout << "cluster: " << freqs.first << " --- { ";
+	for (std::size_t i=0; i<freqs.second.size(); ++i){
+    	    std::cout << freqs.second[i] << " ";
+	}
+	std::cout << "}\n";
+    }
+    
+    // get ram freq
+    std::cout << "DDR Freq: { ";
+    for(const auto freq: dvfs.get_ddr_freq()){
+	std::cout << freq << " ";
+    }
+    std::cout << "}\n";
+
+	// get hard info names
+	std::string names = get_records_names(dvfs);
+	std::cout << names << std::endl;
+
+    // get hard info (without systime)
+	std::vector<std::string> o = get_hard_records(dvfs); //(not including systime)
+														 //record_hard function includes systime
+    
+	// get system time
+	auto now1 = std::chrono::system_clock::now();
+	std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+	auto now2 = std::chrono::system_clock::now();
+	auto millis = std::chrono::duration_cast<std::chrono::milliseconds>(now2-now1).count();
+
+	// get hard info with systime
+	std::cout << std::endl;
+	now1 = std::chrono::system_clock::now();
+	o = get_hard_records(dvfs);
+	now2 = std::chrono::system_clock::now();
+	millis = std::chrono::duration_cast<std::chrono::milliseconds>(now2-now1).count();
+	o.insert(o.begin(), std::to_string(millis));
+	for (std::size_t i=0; i<o.size(); ++i) std::cout << o[i] << ", ";
+	std::cout << "\n" << millis << std::endl;
+
+
+	// write hard_info file
+	bool sigterm = false;
+	record_hard(sigterm, dvfs);	
+	
+	
+	return 0;
+}
+*/
+
 
 static void print_usage(int argc, char ** argv) {
     (void) argc;
@@ -138,6 +213,7 @@ static bool file_is_empty(const std::string & path) {
 #if defined (__unix__) || (defined (__APPLE__) && defined (__MACH__)) || defined (_WIN32)
 static void sigint_handler(int signo) {
     if (signo == SIGINT) {
+        sigterm = true;
         if (!is_interacting && g_params->interactive) {
             is_interacting  = true;
             need_insert_eot = true;
@@ -161,7 +237,23 @@ static std::string chat_add_and_format(struct llama_model * model, std::vector<c
     return formatted;
 }
 
+static std::string chat_reset_and_format(struct llama_model * model, std::vector<common_chat_msg> & chat_msgs, const std::string & role, const std::string & content) {
+    common_chat_msg new_msg{role, content};
+    auto formatted = common_chat_format_single(model, g_params->chat_template, chat_msgs, new_msg, role == "user");
+    // chat_msgs.clear();
+    chat_msgs.push_back({role, content});
+    LOG_DBG("formatted: '%s'\n", formatted.c_str());
+    // std::cout << "[ ";
+    // for (size_t i = 0; i < chat_msgs.size(); i++) {
+    //     std::cout << chat_msgs[i];
+    //     if (i < chat_msgs.size() - 1) std::cout << ", ";
+    // }
+    // std::cout << " ]\n";
+    return formatted;
+}
+
 int main(int argc, char ** argv) {
+    auto start_sys_time = std::chrono::system_clock::now();
     common_params params;
     g_params = &params;
     if (!common_params_parse(argc, argv, params, LLAMA_EXAMPLE_MAIN, print_usage)) {
@@ -176,7 +268,86 @@ int main(int argc, char ** argv) {
             jsonFilePath = argv[i + 1];
         }
     }
-    // --------------------------------------------------
+    std::string device_name = ".json";
+    for (int i = 1; i < argc; i++) {
+        if (std::string(argv[i]) == "--device-name" && i + 1 < argc) {
+            device_name = argv[i + 1];
+            //check_hardware(device_name);
+        }
+    }
+    std::string output_csv_path, output_txt_path;
+    for (int i = 1; i < argc; i++) {
+        if (std::string(argv[i]) == "--output-path" && i + 1 < argc) {
+            output_csv_path = argv[i + 1]; 
+            output_txt_path = argv[i + 1];
+            size_t tmp_pos = output_csv_path.find_last_of(".");
+            if (tmp_pos!= std::string::npos) {
+                output_csv_path.insert(tmp_pos, "_infer"); 
+                output_txt_path.replace(tmp_pos, std::string::npos, "_hard.txt");
+            }
+            // ex) --output-path /abc/mypath/data.csv -> output_csv_path = "/abc/mypath/data_infer.csv"
+            break;
+            //check_hardware(device_name);
+        } else {
+            //시스템 시간, 프리필속도, 디코드 속도, 프리필토큰수, 디코드 토큰수, ttft
+            output_csv_path = std::string(INFER_RECORD_FILE);
+        }
+    }
+    
+    // double dp_itvl = 0.0;  // 기본값 설정
+    // for (int i = 1; i < argc; i++) {
+    //     if (std::string(argv[i]) == "--dp-itvl" && i + 1 < argc) {
+    //         dp_itvl =  std::stod(argv[i + 1]) / 1000.0;
+    //     }
+    // }
+
+    std::ofstream file(output_csv_path, std::ios::app);
+    if (file.is_open() && output_csv_path!="") {
+        file << "sys_time" << "," <<"prefil_time(token/sec)"<< "," << "decode_time(token/sec)" << "," 
+              << "prefil_tokens" << ","<< "decode_tokens" << "," << "ttft" <<"\n";
+        file.close();
+    }
+    
+    int cpu_freq_idx;
+    for (int i = 1; i < argc; i++) {
+        if (std::string(argv[i]) == "--cpu-freq" && i + 1 < argc) {
+            cpu_freq_idx = std::stoi(argv[i + 1]);
+            //check_hardware(device_name);
+        }
+    }
+
+    int ram_freq_idx;
+    for (int i = 1; i < argc; i++) {
+        if (std::string(argv[i]) == "--ram-freq" && i + 1 < argc) {
+            ram_freq_idx = std::stoi(argv[i + 1]);
+            //check_hardware(device_name);
+        }
+    }
+
+// --------------------------------------------------
+// 하드용 initialization
+    DVFS dvfs(device_name);
+    // set file path
+    if (output_txt_path != "") { dvfs.output_filename = output_txt_path; } 
+    else { dvfs.output_filename = std::string(HARD_RECORD_FILE); }
+    
+    // set cpu & ram freqs
+    const std::vector<int> cpu_freq_indices = dvfs.get_cpu_freqs_conf(cpu_freq_idx);
+    dvfs.set_cpu_freq(cpu_freq_indices);
+    dvfs.set_ram_freq(ram_freq_idx);
+
+// --------------------------------------------------
+
+// ----------------------------------------------------------------
+// 백그라운드 hard recording 시작
+    // clang 19.1.7 not supported
+    //std::future<void> result = std::async(std::launch::async, record_hard, sigterm, dvfs);
+    //std::packaged_task<void()> task([&dvfs] { record_hard(std::ref(sigterm), dvfs); });
+    //std::future<void> result = task.get_future();
+    //std::thread(std::move(task)).detach();
+    std::thread record_thread = std::thread(record_hard, std::ref(sigterm), dvfs);
+// ----------------------------------------------------------------
+
 
     common_init();
     auto & sparams = params.sampling;
@@ -545,6 +716,7 @@ int main(int argc, char ** argv) {
         embd_inp.push_back(decoder_start_token_id);
     }
 
+
     while ((n_remain != 0 && !is_antiprompt) || params.interactive) {
         if (!embd.empty()) {
             int max_embd_size = n_ctx - 4;
@@ -576,6 +748,7 @@ int main(int argc, char ** argv) {
                     LOG_DBG("embd: %s\n", string_from(ctx, embd).c_str());
                     LOG_DBG("clear session path\n");
                     path_session.clear();
+                    
                 }
             } else {
                 while (n_past >= ga_i + ga_w) {
@@ -660,6 +833,7 @@ int main(int argc, char ** argv) {
         if (input_echo && display) {
             for (auto id : embd) {
                 const std::string token_str = common_token_to_piece(ctx, id, params.special);
+                //std::this_thread::sleep_for(std::chrono::duration<double>(dp_itvl));
                 LOG("%s", token_str.c_str());
                 if (embd.size() > 1) {
                     input_tokens.push_back(id);
@@ -732,7 +906,10 @@ int main(int argc, char ** argv) {
                     auto inference_duration = std::chrono::duration_cast<std::chrono::milliseconds>(inference_end_time - inference_start_time).count();
                     // LOG_INF("Inference time for previous question: %lld ms\n", inference_duration);
                     common_perf_print(ctx, smpl);
-
+                    if(output_csv_path!=""){
+                        llama_perf_context_print_custom(ctx, output_csv_path, start_sys_time);
+                    }
+                    //check_hardware(device_name);
                     // common_sampler_free(smpl);
                     inference_started = false;
                 }
@@ -753,8 +930,10 @@ int main(int argc, char ** argv) {
                 // JSON 파일(커맨드라인에서 받은 경로)에서 질문을 순차적으로 사용
                 if (current_question_index < json_questions.size()) {
                     buffer = json_questions[current_question_index++];
+                    ctx_kv_cache_clear(ctx);
+                    llama_perf_context_reset(ctx);
                     LOG_INF("Using question from file: %s\n", buffer.c_str());
-                    LOG("%s", buffer.c_str());
+                    LOG("%s\n", buffer.c_str());
                     // 새 질문의 답변 추론 시작 시각 기록
                     inference_start_time = std::chrono::steady_clock::now();
                     inference_started = true;
@@ -767,9 +946,12 @@ int main(int argc, char ** argv) {
                     string_process_escapes(buffer);
                 }
                 bool format_chat = params.conversation_mode && params.enable_chat_template;
+                chat_add_and_format(model, chat_msgs, "system", params.prompt.empty() ? DEFAULT_SYSTEM_MESSAGE : params.prompt);
                 std::string user_inp = format_chat
-                    ? chat_add_and_format(model, chat_msgs, "user", std::move(buffer))
+                    ? chat_reset_and_format(model, chat_msgs, "user", std::move(buffer))
                     : std::move(buffer);
+                // std::cout << "buffer" << buffer<<"/n";
+                // std::cout << user_inp ;
                 const auto line_pfx = common_tokenize(ctx, params.input_prefix, false, true);
                 const auto line_inp = common_tokenize(ctx, user_inp, false, format_chat);
                 const auto line_sfx = common_tokenize(ctx, params.input_suffix, false, true);
@@ -783,7 +965,7 @@ int main(int argc, char ** argv) {
                     output_ss << common_token_to_piece(ctx, token);
                 }
                 assistant_ss.str("");
-                n_remain -= line_inp.size();
+                // n_remain -= line_inp.size();
                 LOG_DBG("n_remain: %d\n", n_remain);
                 input_echo = false;
             }
@@ -808,6 +990,12 @@ int main(int argc, char ** argv) {
         LOG("\n%s: saving final output to session file '%s'\n", __func__, path_session.c_str());
         llama_state_save_file(ctx, path_session.c_str(), session_tokens.data(), session_tokens.size());
     }
+
+    sigterm = true; // hard_record done
+    //result.get(); // wait for termination
+    dvfs.unset_cpu_freq();
+    dvfs.unset_ram_freq();
+    record_thread.join();
 
     LOG("\n\n");
     common_perf_print(ctx, smpl);

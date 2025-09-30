@@ -29,7 +29,7 @@ add_library(llama
             unicode-data.cpp
             )
 
-add_library(ignite
+add_library(dvfs
             hard/device.h
             hard/device.cpp
             hard/dvfs.h
@@ -44,9 +44,9 @@ target_include_directories(llama PUBLIC . ../include)
 target_compile_features   (llama PUBLIC cxx_std_17) # don't bump
 target_link_libraries(llama PUBLIC ggml)
 
-target_include_directories(ignite PUBLIC . .)
-target_compile_features   (ignite PUBLIC cxx_std_17) # don't bump
-target_link_libraries(ignite PUBLIC ggml)
+target_include_directories(dvfs PUBLIC . .)
+target_compile_features   (dvfs PUBLIC cxx_std_17) # don't bump
+target_link_libraries(dvfs PUBLIC ggml)
 
 if (BUILD_SHARED_LIBS)
     set_target_properties(llama PROPERTIES POSITION_INDEPENDENT_CODE ON)

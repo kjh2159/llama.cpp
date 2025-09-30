@@ -12,7 +12,7 @@ add_executable(${TARGET} phase-pause.cpp ${HARD_SOURCES})
 # 필요한 라이브러리 연결 (기존 코드 유지)
 # hard library is integrated into ignite
 find_package(Threads REQUIRED)
-target_link_libraries(${TARGET} PRIVATE common llama ignite ${CMAKE_THREAD_LIBS_INIT} Threads::Threads)
+target_link_libraries(${TARGET} PRIVATE common llama dvfs ${CMAKE_THREAD_LIBS_INIT} Threads::Threads)
 
 # C++17 사용 (기존 코드 유지)
 target_compile_features(${TARGET} PRIVATE cxx_std_17)
