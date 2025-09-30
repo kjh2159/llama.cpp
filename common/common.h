@@ -187,15 +187,23 @@ struct common_params_vocoder {
 };
 
 struct common_params {
-    std::string json_path;
-    std::string csv_path;    // CSV 파일 경로
-    std::string device_name;
+    // for stream
+    std::string json_path = "questions.json";
+    std::string csv_path;    // CSV file path
     std::string output_csv_path;
-    int csv_limit = 0;       // CSV 질문 개수 제한 (0이면 제한 없음)
+    int csv_limit = 0;       // limit of CSV questions (0=no limit)
+
+    // for dvfs
+    std::string device_name;
     int cpu_freq_idx = 0;
     int ram_freq_idx = 0;
-    int dp_itvl=0;
 
+    // for ignite
+    int dp_itvl=0;
+    int lp=0;
+    int dp=0;
+
+    /* Original Params */
     int32_t n_predict             =    -1; // new tokens to predict
     int32_t n_ctx                 =  4096; // context size
     int32_t n_batch               =  2048; // logical batch size for prompt processing (must be >=32 to use BLAS)

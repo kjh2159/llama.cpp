@@ -36,6 +36,7 @@
 // dvfs library
 #include "hard/record.h"
 #include "hard/dvfs.h"
+#include "hard/utils.h"
 
 
 #include <thread>
@@ -260,71 +261,96 @@ int main(int argc, char ** argv) {
         return 1;
     }
 
-    // --- cmd line: read json file path --- 
-    std::string jsonFilePath = "questions.json";
-    for (int i = 1; i < argc; i++) {
-        if (std::string(argv[i]) == "--json-path" && i + 1 < argc) {
-            jsonFilePath = argv[i + 1];
-        }
-    }
-    std::string device_name = ".json";
-    for (int i = 1; i < argc; i++) {
-        if (std::string(argv[i]) == "--device-name" && i + 1 < argc) {
-            device_name = argv[i + 1];
-            //check_hardware(device_name);
-        }
-    }
-    std::string output_csv_path, output_txt_path;
-    for (int i = 1; i < argc; i++) {
-        if (std::string(argv[i]) == "--output-path" && i + 1 < argc) {
-            output_csv_path = argv[i + 1]; 
-            output_txt_path = argv[i + 1];
-            size_t tmp_pos = output_csv_path.find_last_of(".");
-            if (tmp_pos!= std::string::npos) {
-                output_csv_path.insert(tmp_pos, "_infer"); 
-                output_txt_path.replace(tmp_pos, std::string::npos, "_hard.txt");
-            }
-            // ex) --output-path /abc/mypath/data.csv -> output_csv_path = "/abc/mypath/data_infer.csv"
-            break;
-            //check_hardware(device_name);
-        } else {
-            // system time, prefill speed, decode speed, prefill tokens, decode tokens, ttft
-            output_csv_path = std::string(INFER_RECORD_FILE);
-        }
-    }
+    /*
+    -- parameter list for ignite --
+        # for stream
+            - json_path;        // JSON file path (not used)
+            - csv_path;         // CSV file path
+            - output_csv_path;  // output path
+            - csv_limit;        // limit of CSV questions (0=no limit)
+          x  - interface         // interface mode (0: only processing, 1: print result)
+          x  - qa_start         // start line of QA (0: from the first line)
+
+
+        # for dvfs
+            - device_name;      // device name
+            - cpu_freq_idx;     // cpu freq index
+            - ram_freq_idx;     // ram freq index
+
+        # for ignite
+            - dp_itvl;          // dp interval (ms)
+            - lp;               // layer pause (ms)
+            - tp;               // token pause (ms)
+    */
     
-    // double dp_itvl = 0.0;  // initial value
+// --------------------------------------------------
+// for stream
+    // TODO: change
+    std::string output_path = replace(params.output_csv_path, ".csv", "_infer.csv");
+    std::string output_txt_path = replace(output_path, "_infer.csv", "_hard.txt");
+    std::string json_path = params.json_path;
+    int length = params.csv_limit;
+
+// for dvfs
+    std::string device_name = params.device_name;
+    int cpu_freq_idx = params.cpu_freq_idx;
+    int ram_freq_idx = params.ram_freq_idx;
+
+// for ignite
+    int dp_itvl = params.dp_itvl;
+    int lp = params.lp;
+    int tp = params.dp;
+// --------------------------------------------------
+
+
+    // --- cmd line: read json file path --- 
+    // std::string jsonFilePath = "questions.json";
     // for (int i = 1; i < argc; i++) {
-    //     if (std::string(argv[i]) == "--dp-itvl" && i + 1 < argc) {
-    //         dp_itvl =  std::stod(argv[i + 1]) / 1000.0;
+    //     if (std::string(argv[i]) == "--json-path" && i + 1 < argc) {
+    //         jsonFilePath = argv[i + 1];
     //     }
     // }
-
-    std::ofstream file(output_csv_path, std::ios::app);
-    if (file.is_open() && output_csv_path!="") {
-        file << "sys_time" << "," <<"prefil_time(token/sec)"<< "," << "decode_time(token/sec)" << "," 
-              << "prefil_tokens" << ","<< "decode_tokens" << "," << "ttft" <<"\n";
-        file.close();
-    }
+    // std::string device_name = ".json";
+    // for (int i = 1; i < argc; i++) {
+    //     if (std::string(argv[i]) == "--device-name" && i + 1 < argc) {
+    //         device_name = argv[i + 1];
+    //         //check_hardware(device_name);
+    //     }
+    // }
+    // std::string output_csv_path, output_txt_path;
+    // for (int i = 1; i < argc; i++) {
+    //     if (std::string(argv[i]) == "--output-path" && i + 1 < argc) {
+    //         output_csv_path = argv[i + 1]; 
+    //         output_txt_path = argv[i + 1];
+    //         size_t tmp_pos = output_csv_path.find_last_of(".");
+    //         if (tmp_pos!= std::string::npos) {
+    //             output_csv_path.insert(tmp_pos, "_infer"); 
+    //             output_txt_path.replace(tmp_pos, std::string::npos, "_hard.txt");
+    //         }
+    //         // ex) --output-path /abc/mypath/data.csv -> output_csv_path = "/abc/mypath/data_infer.csv"
+    //         break;
+    //         //check_hardware(device_name);
+    //     } else {
+    //         // system time, prefill speed, decode speed, prefill tokens, decode tokens, ttft
+    //         output_csv_path = std::string(INFER_RECORD_FILE);
+    //     }
+    // }
     
-    int cpu_freq_idx;
-    for (int i = 1; i < argc; i++) {
-        if (std::string(argv[i]) == "--cpu-freq" && i + 1 < argc) {
-            cpu_freq_idx = std::stoi(argv[i + 1]);
-            //check_hardware(device_name);
-        }
-    }
+    // // double dp_itvl = 0.0;  // initial value
+    // // for (int i = 1; i < argc; i++) {
+    // //     if (std::string(argv[i]) == "--dp-itvl" && i + 1 < argc) {
+    // //         dp_itvl =  std::stod(argv[i + 1]) / 1000.0;
+    // //     }
+    // // }
 
-    int ram_freq_idx;
-    for (int i = 1; i < argc; i++) {
-        if (std::string(argv[i]) == "--ram-freq" && i + 1 < argc) {
-            ram_freq_idx = std::stoi(argv[i + 1]);
-            //check_hardware(device_name);
-        }
+    std::ofstream file(output_path, std::ios::app);
+    if (file.is_open() && output_path!="") {
+        file << "sys_time, prefill_speed, decode_speed, prefill_token, decode_token, ttft\n";
+        file.close();
     }
 
 // --------------------------------------------------
-// 하드용 initialization
+// DVFS initialization
     DVFS dvfs(device_name);
     // set file path
     if (output_txt_path != "") { dvfs.output_filename = output_txt_path; } 
@@ -334,11 +360,10 @@ int main(int argc, char ** argv) {
     const std::vector<int> cpu_freq_indices = dvfs.get_cpu_freqs_conf(cpu_freq_idx);
     dvfs.set_cpu_freq(cpu_freq_indices);
     dvfs.set_ram_freq(ram_freq_idx);
-
 // --------------------------------------------------
 
 // ----------------------------------------------------------------
-// bg hard recording 시작
+// bg hard recording thread
     // clang 19.1.7 not supported
     //std::future<void> result = std::async(std::launch::async, record_hard, sigterm, dvfs);
     //std::packaged_task<void()> task([&dvfs] { record_hard(std::ref(sigterm), dvfs); });
@@ -570,9 +595,9 @@ int main(int argc, char ** argv) {
     std::vector<std::string> json_questions;
     size_t current_question_index = 0;
     if (params.interactive) {
-        json_questions = loadQuestions(jsonFilePath);
+        json_questions = loadQuestions(json_path);
         if (json_questions.empty()) {
-            LOG_ERR("No questions loaded from %s. Exiting interactive mode.\n", jsonFilePath.c_str());
+            LOG_ERR("No questions loaded from %s. Exiting interactive mode.\n", json_path.c_str());
             return 1;
         }
     }
@@ -905,8 +930,8 @@ int main(int argc, char ** argv) {
                     auto inference_duration = std::chrono::duration_cast<std::chrono::milliseconds>(inference_end_time - inference_start_time).count();
                     // LOG_INF("Inference time for previous question: %lld ms\n", inference_duration);
                     common_perf_print(ctx, smpl);
-                    if(output_csv_path!=""){
-                        llama_perf_context_print_custom(ctx, output_csv_path, start_sys_time);
+                    if(output_path!=""){
+                        llama_perf_context_print_custom(ctx, output_path, start_sys_time);
                     }
                     //check_hardware(device_name);
                     // common_sampler_free(smpl);
@@ -937,7 +962,7 @@ int main(int argc, char ** argv) {
                     inference_start_time = std::chrono::steady_clock::now();
                     inference_started = true;
                 } else {
-                    LOG_INF("No more questions available in %s. Exiting interactive mode.\n", jsonFilePath.c_str());
+                    LOG_INF("No more questions available in %s. Exiting interactive mode.\n", json_path.c_str());
                     break;
                 }
                 const size_t original_size = embd_inp.size();

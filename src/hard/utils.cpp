@@ -40,3 +40,12 @@ std::vector<std::vector<std::string>> readCSV(const std::string& filename) {
     file.close();
     return result;
 }
+
+std::string replace(std::string origin, std::string target, std::string destination) {
+    size_t pos = 0;
+    while ((pos = origin.find(target, pos)) != std::string::npos) {
+        origin.replace(pos, target.length(), destination);
+        pos += destination.length();
+    }
+    return origin;
+}
