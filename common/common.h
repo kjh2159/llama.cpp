@@ -201,7 +201,7 @@ struct common_params {
     // for ignite
     int dp_itvl=0;
     int lp=0;
-    int dp=0;
+    int tp=0;
 
     /* Original Params */
     int32_t n_predict             =    -1; // new tokens to predict

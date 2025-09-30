@@ -299,7 +299,7 @@ int main(int argc, char ** argv) {
 // for ignite
     int dp_itvl = params.dp_itvl;
     int lp = params.lp;
-    int tp = params.dp;
+    int tp = params.tp;
 // --------------------------------------------------
 
 

@@ -499,12 +499,29 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
     ).set_examples({LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_MAIN}));
 
     add_opt(common_arg(
-        {"--dp-itvl"}, "DP",
-        "decode phase interval",
+        {"--phase-pause"}, "PP",
+        "phase pause time for ignite (ms)",
         [](common_params &params, const int value) {
             params.dp_itvl = value;
         }
     ).set_examples({LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_MAIN}));
+    
+    add_opt(common_arg(
+        {"--layer-pause"}, "LP",
+        "layer pause time for ignite (ms)",
+        [](common_params &params, const int value) {
+            params.lp = value;
+        }
+    ).set_examples({LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_MAIN}));
+    
+    add_opt(common_arg(
+        {"--token-pause"}, "TP",
+        "output token pause time for ignite (ms)",
+        [](common_params &params, const int value) {
+            params.tp = value;
+        }
+    ).set_examples({LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_MAIN}));
+
 
     add_opt(common_arg(
         {"-h", "--help", "--usage"},
