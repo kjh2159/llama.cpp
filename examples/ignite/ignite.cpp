@@ -13,7 +13,7 @@
 #include <sstream>
 #include <string>
 #include <vector>
-#include <chrono>   // << 추가: 고해상도 타이머 사용
+#include <chrono>
 #include <future>
 #include <atomic>
 
@@ -90,13 +90,13 @@ std::tuple<int, double, int, double> llama_perf_context_print_custom(const struc
 }
 
 
-// 아주 단순한 방식으로 "questions.json" 파일을 파싱하는 함수.
-// JSON 파일 형식은 아래와 같이 가정합니다:
+// A parsing function for "questions.json" with very simple way
+// The following is JSON file type:
 // {
 //   "questions": [
-//     "첫 번째 질문 내용",
-//     "두 번째 질문 내용",
-//     "세 번째 질문 내용"
+//     "the first content of question",
+//     "the second content of question",
+//     "the third content of question"
 //   ]
 // }
 
@@ -114,7 +114,7 @@ std::vector<std::string> loadQuestions(const std::string &filename) {
 
     try {
         json jsonData;
-        file >> jsonData; // JSON 파싱
+        file >> jsonData; // JSON parsing
 
         if (jsonData.contains("questions") && jsonData["questions"].is_array()) {
             for (const auto& item : jsonData["questions"]) {
@@ -195,7 +195,7 @@ static void print_usage(int argc, char ** argv) {
     LOG("\nexample usage:\n");
     LOG("\n  text generation:     %s -m your_model.gguf -p \"I believe the meaning of life is\" -n 128\n", argv[0]);
     LOG("\n  chat (conversation): %s -m your_model.gguf -p \"You are a helpful assistant\" -cnv\n", argv[0]);
-    LOG("\n  (json 파일 경로 지정: -json-path <파일경로>)\n");
+    LOG("\n  (Specifying json file paht: -json-path <path>)\n");
 }
 
 static bool file_exists(const std::string & path) {
@@ -260,8 +260,7 @@ int main(int argc, char ** argv) {
         return 1;
     }
 
-    // --- 커맨드라인 인자로부터 json 파일 경로 읽기 --- 
-    // 기본값은 "questions.json"입니다.
+    // --- cmd line: read json file path --- 
     std::string jsonFilePath = "questions.json";
     for (int i = 1; i < argc; i++) {
         if (std::string(argv[i]) == "--json-path" && i + 1 < argc) {
@@ -289,12 +288,12 @@ int main(int argc, char ** argv) {
             break;
             //check_hardware(device_name);
         } else {
-            //시스템 시간, 프리필속도, 디코드 속도, 프리필토큰수, 디코드 토큰수, ttft
+            // system time, prefill speed, decode speed, prefill tokens, decode tokens, ttft
             output_csv_path = std::string(INFER_RECORD_FILE);
         }
     }
     
-    // double dp_itvl = 0.0;  // 기본값 설정
+    // double dp_itvl = 0.0;  // initial value
     // for (int i = 1; i < argc; i++) {
     //     if (std::string(argv[i]) == "--dp-itvl" && i + 1 < argc) {
     //         dp_itvl =  std::stod(argv[i + 1]) / 1000.0;
@@ -339,7 +338,7 @@ int main(int argc, char ** argv) {
 // --------------------------------------------------
 
 // ----------------------------------------------------------------
-// 백그라운드 hard recording 시작
+// bg hard recording 시작
     // clang 19.1.7 not supported
     //std::future<void> result = std::async(std::launch::async, record_hard, sigterm, dvfs);
     //std::packaged_task<void()> task([&dvfs] { record_hard(std::ref(sigterm), dvfs); });
@@ -567,7 +566,7 @@ int main(int argc, char ** argv) {
         LOG_INF("\n");
     }
 
-    // --- CLI 입력 대신 JSON 파일에서 질문 읽어오기 (직접 파싱) ---
+    // --- Input json file instead of cli input ---
     std::vector<std::string> json_questions;
     size_t current_question_index = 0;
     if (params.interactive) {
@@ -577,7 +576,7 @@ int main(int argc, char ** argv) {
             return 1;
         }
     }
-    // --- JSON 질문 로딩 완료 ---
+    // --- JSON questions load done ---
 
     // ctrl+C handling
     {
@@ -631,7 +630,7 @@ int main(int argc, char ** argv) {
         }
     }
 
-    // --- 타이머 관련 변수 (각 질문에 대한 추론시간 측정을 위해) ---
+    // --- timer variables ---
     std::chrono::steady_clock::time_point inference_start_time;
     bool inference_started = false;
 
@@ -899,7 +898,7 @@ int main(int argc, char ** argv) {
                 assistant_ss << common_token_to_piece(ctx, id, false);
             }
             // -------------------------------
-            // 여기서 이전 질문에 대한 추론 완료 시각을 측정하여 출력합니다.
+            // Print inference time for previous question
             if (n_past > 0 && is_interacting) {
                 if (inference_started) {
                     auto inference_end_time = std::chrono::steady_clock::now();
@@ -927,14 +926,14 @@ int main(int argc, char ** argv) {
                     LOG_DBG("appending input prefix: '%s'\n", params.input_prefix.c_str());
                     LOG("%s", params.input_prefix.c_str());
                 }
-                // JSON 파일(커맨드라인에서 받은 경로)에서 질문을 순차적으로 사용
+                // Use next question from JSON file
                 if (current_question_index < json_questions.size()) {
                     buffer = json_questions[current_question_index++];
                     ctx_kv_cache_clear(ctx);
                     llama_perf_context_reset(ctx);
                     LOG_INF("Using question from file: %s\n", buffer.c_str());
                     LOG("%s\n", buffer.c_str());
-                    // 새 질문의 답변 추론 시작 시각 기록
+                    // Record the begining time of inference for a new question
                     inference_start_time = std::chrono::steady_clock::now();
                     inference_started = true;
                 } else {
