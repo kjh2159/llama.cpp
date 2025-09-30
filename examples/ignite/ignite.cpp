@@ -33,14 +33,14 @@
 #pragma warning(disable: 4244 4267) // possible loss of data
 #endif
 
-//하드웨어 관련 라이브러리
+// dvfs library
 #include "hard/record.h"
 #include "hard/dvfs.h"
 
 
 #include <thread>
 #include <tuple>
-#include "json.hpp" // JSON 라이브러리
+#include "json.hpp" // JSON library
 
 static const char * DEFAULT_SYSTEM_MESSAGE = "You are a helpful assistant";
 
@@ -76,7 +76,7 @@ std::tuple<int, double, int, double> llama_perf_context_print_custom(const struc
     // Convert time_point to time_t (seconds since epoch)
     auto now_sys_time = std::chrono::system_clock::now();
     auto sys_time = std::chrono::duration_cast<std::chrono::milliseconds>(now_sys_time-start_sys_time).count();
-    // 시스템 시간, 프리필속도, 디코드 속도, 프리필토큰수, 디코드 토큰수, ttft
+    // system time, prefill speed, decode speed, prefill tokens, decode tokens, ttft
     std::ofstream file(output_filename, std::ios::app);
     if (file.is_open()) {
         file << std::to_string(sys_time) << "," << ( 1e3 / data.t_p_eval_ms *data.n_p_eval ) << "," << (1e3 / data.t_eval_ms * data.n_eval ) << "," 
