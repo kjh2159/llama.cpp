@@ -5,9 +5,9 @@
 #include "ggml-backend.h"
 #include "ggml-impl.h"
 #include "ggml-cpu.h"
-#include "ggml-cpu-traits.h"
+#include "traits.h"
 
-#if defined(__gnu_linux__)
+#if defined(__linux__)
 #include <sys/syscall.h>
 #include <unistd.h>
 #endif
@@ -50,10 +50,11 @@ static void * ggml_backend_amx_buffer_get_base(ggml_backend_buffer_t buffer) {
     return (void *) (buffer->context);
 }
 
-static void ggml_backend_amx_buffer_init_tensor(ggml_backend_buffer_t buffer, struct ggml_tensor * tensor) {
+static enum ggml_status ggml_backend_amx_buffer_init_tensor(ggml_backend_buffer_t buffer, struct ggml_tensor * tensor) {
     tensor->extra = (void *) ggml::cpu::amx::get_tensor_traits(buffer, tensor);
 
     GGML_UNUSED(buffer);
+    return GGML_STATUS_SUCCESS;
 }
 
 static void ggml_backend_amx_buffer_memset_tensor(ggml_backend_buffer_t buffer, struct ggml_tensor * tensor,
@@ -185,7 +186,7 @@ static size_t ggml_backend_amx_buffer_type_get_alloc_size(ggml_backend_buffer_ty
 #define XFEATURE_XTILEDATA      18
 
 static bool ggml_amx_init() {
-#if defined(__gnu_linux__)
+#if defined(__linux__)
     if (syscall(SYS_arch_prctl, ARCH_REQ_XCOMP_PERM, XFEATURE_XTILEDATA)) {
         fprintf(stderr, "AMX is not ready to be used!\n");
         return false;
@@ -193,6 +194,8 @@ static bool ggml_amx_init() {
     return true;
 #elif defined(_WIN32)
     return true;
+#else
+    return false;
 #endif
 }
 

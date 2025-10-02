@@ -2,27 +2,29 @@
 #define GGML_SYCL_ELEMENTWISE_HPP
 
 #include "common.hpp"
+#include "ggml.h"
+#include <limits> // For std::numeric_limits
 
-static __dpct_inline__ float op_repeat(const float a, const float b) {
-    return b;
-    GGML_UNUSED(a);
+template <typename T>
+T neg_infinity() {
+    return -std::numeric_limits<T>::infinity();
 }
 
-static __dpct_inline__ float op_add(const float a, const float b) {
-    return a + b;
+template<typename T_Dst, typename T_Src = T_Dst>
+struct typed_data {
+    const T_Src * src;
+    T_Dst * dst;
+};
+
+template<typename T_Dst, typename T_Src = T_Dst>
+typed_data<T_Dst, T_Src> cast_data(ggml_tensor * dst) {
+    return {
+        /* .src = */ static_cast<const T_Src *>(dst->src[0]->data),
+        /* .dst = */ static_cast<T_Dst *>(dst->data)
+    };
 }
 
-static __dpct_inline__ float op_sub(const float a, const float b) {
-    return a - b;
-}
-
-static __dpct_inline__ float op_mul(const float a, const float b) {
-    return a * b;
-}
-
-static __dpct_inline__ float op_div(const float a, const float b) {
-    return a / b;
-}
+const float GELU_QUICK_COEF = -1.702f;
 
 
 void ggml_sycl_sqrt(ggml_backend_sycl_context & ctx, ggml_tensor * dst);
@@ -38,6 +40,8 @@ void ggml_sycl_gelu(ggml_backend_sycl_context & ctx, ggml_tensor * dst);
 void ggml_sycl_silu(ggml_backend_sycl_context & ctx, ggml_tensor * dst);
 
 void ggml_sycl_gelu_quick(ggml_backend_sycl_context & ctx, ggml_tensor * dst);
+
+void ggml_sycl_gelu_erf(ggml_backend_sycl_context & ctx, ggml_tensor * dst);
 
 void ggml_sycl_tanh(ggml_backend_sycl_context & ctx, ggml_tensor * dst);
 
@@ -65,12 +69,18 @@ void ggml_sycl_upscale(ggml_backend_sycl_context & ctx, ggml_tensor * dst);
 
 void ggml_sycl_pad(ggml_backend_sycl_context & ctx, ggml_tensor * dst);
 
-void ggml_sycl_add(ggml_backend_sycl_context & ctx, ggml_tensor * dst);
+void ggml_sycl_clamp(ggml_backend_sycl_context & ctx, ggml_tensor * dst);
 
-void ggml_sycl_sub(ggml_backend_sycl_context & ctx, ggml_tensor * dst);
+void ggml_sycl_sgn(ggml_backend_sycl_context & ctx, ggml_tensor * dst);
 
-void ggml_sycl_mul(ggml_backend_sycl_context & ctx, ggml_tensor * dst);
+void ggml_sycl_abs(ggml_backend_sycl_context & ctx, ggml_tensor * dst);
 
-void ggml_sycl_div(ggml_backend_sycl_context & ctx, ggml_tensor * dst);
+void ggml_sycl_elu(ggml_backend_sycl_context & ctx, ggml_tensor * dst);
+
+void ggml_sycl_geglu(ggml_backend_sycl_context & ctx, ggml_tensor * dst);
+void ggml_sycl_reglu(ggml_backend_sycl_context & ctx, ggml_tensor * dst);
+void ggml_sycl_swiglu(ggml_backend_sycl_context & ctx, ggml_tensor * dst);
+void ggml_sycl_geglu_erf(ggml_backend_sycl_context & ctx, ggml_tensor * dst);
+void ggml_sycl_geglu_quick(ggml_backend_sycl_context & ctx, ggml_tensor * dst);
 
 #endif // GGML_SYCL_ELEMENTWISE_HPP

@@ -12,7 +12,7 @@ import json
 from math import prod
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Iterable, Iterator, Sequence, SupportsIndex, cast
-from transformers import AutoConfig
+from transformers import AutoConfig, AutoTokenizer
 
 import torch
 
@@ -24,7 +24,9 @@ if 'NO_LOCAL_GGUF' not in os.environ:
 import gguf
 
 # reuse model definitions from convert_hf_to_gguf.py
-from convert_hf_to_gguf import LazyTorchTensor, Model
+from convert_hf_to_gguf import LazyTorchTensor, ModelBase
+
+from gguf.constants import GGUFValueType
 
 logger = logging.getLogger("lora-to-gguf")
 
@@ -340,11 +342,11 @@ if __name__ == '__main__':
             sys.exit(1)
     else:
         logger.info(f"Loading base model: {dir_base_model.name}")
-        hparams = Model.load_hparams(dir_base_model)
+        hparams = ModelBase.load_hparams(dir_base_model, False)
 
     with torch.inference_mode():
         try:
-            model_class = Model.from_model_architecture(hparams["architectures"][0])
+            model_class = ModelBase.from_model_architecture(hparams["architectures"][0])
         except NotImplementedError:
             logger.error(f"Model {hparams['architectures'][0]} is not supported")
             sys.exit(1)
@@ -369,7 +371,31 @@ if __name__ == '__main__':
                 self.gguf_writer.add_string(gguf.Keys.Adapter.TYPE, "lora")
 
             def set_gguf_parameters(self):
+                logger.debug("GGUF KV: %s = %d", gguf.Keys.Adapter.LORA_ALPHA, self.lora_alpha)
                 self.gguf_writer.add_float32(gguf.Keys.Adapter.LORA_ALPHA, self.lora_alpha)
+                alora_invocation_tokens = lparams.get("alora_invocation_tokens")
+                invocation_string = lparams.get("invocation_string")
+                if invocation_string and not alora_invocation_tokens:
+                    logger.debug("Tokenizing invocation_string -> alora_invocation_tokens")
+                    base_model_path_or_id = hparams.get("_name_or_path")
+                    try:
+                        tokenizer = AutoTokenizer.from_pretrained(base_model_path_or_id)
+                    except ValueError:
+                        logger.error("Unable to load tokenizer from %s", base_model_path_or_id)
+                        raise
+                    # NOTE: There's an off-by-one with the older aLoRAs where
+                    # the invocation string includes the "<|start_of_turn|>"
+                    # token, but the adapters themselves were trained to
+                    # activate _after_ that first token, so we drop it here.
+                    alora_invocation_tokens = tokenizer(invocation_string)["input_ids"][1:]
+                if alora_invocation_tokens:
+                    logger.debug("GGUF KV: %s = %s", gguf.Keys.Adapter.ALORA_INVOCATION_TOKENS, alora_invocation_tokens)
+                    self.gguf_writer.add_key_value(
+                        gguf.Keys.Adapter.ALORA_INVOCATION_TOKENS,
+                        alora_invocation_tokens,
+                        GGUFValueType.ARRAY,
+                        GGUFValueType.UINT32,
+                    )
 
             def generate_extra_tensors(self) -> Iterable[tuple[str, Tensor]]:
                 # Never add extra tensors (e.g. rope_freqs) for LoRA adapters
@@ -395,7 +421,7 @@ if __name__ == '__main__':
                         logger.error(f"Unexpected name '{name}': Not a lora_A or lora_B tensor")
                         if ".embed_tokens.weight" in name or ".lm_head.weight" in name:
                             logger.error("Embeddings is present in the adapter. This can be due to new tokens added during fine tuning")
-                            logger.error("Please refer to https://github.com/ggerganov/llama.cpp/pull/9948")
+                            logger.error("Please refer to https://github.com/ggml-org/llama.cpp/pull/9948")
                         sys.exit(1)
 
                     if base_name in tensor_map:
@@ -419,7 +445,7 @@ if __name__ == '__main__':
                 # some archs may have the same tensor for lm_head and output (tie word embeddings)
                 # in this case, adapters targeting lm_head will fail when using llama-export-lora
                 # therefore, we ignore them for now
-                # see: https://github.com/ggerganov/llama.cpp/issues/9065
+                # see: https://github.com/ggml-org/llama.cpp/issues/9065
                 if name == "lm_head.weight" and len(dest) == 0:
                     raise ValueError("lm_head is present in adapter, but is ignored in base model")
                 for dest_name, dest_data in dest:

@@ -194,7 +194,7 @@ Java_android_llama_cpp_LLamaAndroid_bench_1model(
         }
 
         batch->logits[batch->n_tokens - 1] = true;
-        llama_kv_cache_clear(context);
+        llama_memory_clear(llama_get_memory(context), false);
 
         const auto t_pp_start = ggml_time_us();
         if (llama_decode(context, *batch) != 0) {
@@ -206,7 +206,7 @@ Java_android_llama_cpp_LLamaAndroid_bench_1model(
 
         LOGi("Benchmark text generation (tg)");
 
-        llama_kv_cache_clear(context);
+        llama_memory_clear(llama_get_memory(context), false);
         const auto t_tg_start = ggml_time_us();
         for (i = 0; i < tg; i++) {
 
@@ -223,7 +223,7 @@ Java_android_llama_cpp_LLamaAndroid_bench_1model(
 
         const auto t_tg_end = ggml_time_us();
 
-        llama_kv_cache_clear(context);
+        llama_memory_clear(llama_get_memory(context), false);
 
         const auto t_pp = double(t_pp_end - t_pp_start) / 1000000.0;
         const auto t_tg = double(t_tg_end - t_tg_start) / 1000000.0;
@@ -347,6 +347,7 @@ Java_android_llama_cpp_LLamaAndroid_completion_1init(
         jlong context_pointer,
         jlong batch_pointer,
         jstring jtext,
+        jboolean format_chat,
         jint n_len
     ) {
 
@@ -356,10 +357,11 @@ Java_android_llama_cpp_LLamaAndroid_completion_1init(
     const auto context = reinterpret_cast<llama_context *>(context_pointer);
     const auto batch = reinterpret_cast<llama_batch *>(batch_pointer);
 
-    const auto tokens_list = common_tokenize(context, text, 1);
+    bool parse_special = (format_chat == JNI_TRUE);
+    const auto tokens_list = common_tokenize(context, text, true, parse_special);
 
     auto n_ctx = llama_n_ctx(context);
-    auto n_kv_req = tokens_list.size() + (n_len - tokens_list.size());
+    auto n_kv_req = tokens_list.size() + n_len;
 
     LOGi("n_len = %d, n_ctx = %d, n_kv_req = %d", n_len, n_ctx, n_kv_req);
 
@@ -368,7 +370,7 @@ Java_android_llama_cpp_LLamaAndroid_completion_1init(
     }
 
     for (auto id : tokens_list) {
-        LOGi("%s", common_token_to_piece(context, id).c_str());
+        LOGi("token: `%s`-> %d ", common_token_to_piece(context, id).c_str(), id);
     }
 
     common_batch_clear(*batch);
@@ -446,5 +448,5 @@ Java_android_llama_cpp_LLamaAndroid_completion_1loop(
 extern "C"
 JNIEXPORT void JNICALL
 Java_android_llama_cpp_LLamaAndroid_kv_1cache_1clear(JNIEnv *, jobject, jlong context) {
-    llama_kv_cache_clear(reinterpret_cast<llama_context *>(context));
+    llama_memory_clear(llama_get_memory(reinterpret_cast<llama_context *>(context)), true);
 }

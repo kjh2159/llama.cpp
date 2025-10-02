@@ -31,9 +31,18 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <atomic>
+#include <condition_variable>
+#include <mutex>
+#include <thread>
+#include <unistd.h>
+#include <functional>
+#include <optional>
+#include <list>
 
 #include "../include/ggml-cann.h"
 #include "../include/ggml.h"
+#include "../ggml-impl.h"
 
 #define MATRIX_ROW_PADDING 512
 #define GGML_CANN_MAX_STREAMS 8
@@ -95,6 +104,10 @@ const ggml_cann_device_info& ggml_cann_info();
 
 void ggml_cann_set_device(int32_t device);
 int32_t ggml_cann_get_device();
+
+std::optional<std::string> get_env(const std::string& name);
+bool parse_bool(const std::string& value);
+int parse_integer(const std::string& value);
 
 /**
  * @brief Abstract base class for memory pools used by CANN.
@@ -206,6 +219,247 @@ struct ggml_cann_pool_alloc {
 };
 
 /**
+ * @brief Function pointer type for ACLNN operator calls.
+ */
+using aclnn_func_t = aclnnStatus (*)(void*, uint64_t, aclOpExecutor*, aclrtStream);
+
+/**
+ * @brief Base class for all CANN tasks to be submitted to the task queue.
+ *
+ * Users should override the run_task() method with actual task logic.
+ */
+class cann_task {
+public:
+    virtual void run_task() {}
+};
+
+/**
+ * @brief A lock-free ring-buffer based task queue for asynchronously executing cann_task instances.
+ */
+class cann_task_queue {
+public:
+    /**
+     * @brief Constructs a task queue with a fixed power-of-two capacity for a specific device.
+     *
+     * @param capacity Queue capacity. Must be a power of 2.
+     * @param device Target device ID (used for context setting).
+     */
+    explicit cann_task_queue(size_t capacity, int32_t device)
+        : buffer_(capacity), capacity_(capacity), head_(0), tail_(0),
+          running_(false), device_(device) {
+        GGML_ASSERT((capacity & (capacity - 1)) == 0 && "capacity must be power of 2");
+        mask_ = capacity_ - 1;
+    }
+
+    /**
+     * @brief Attempts to enqueue a task into the queue.
+     *
+     * @param item Unique pointer to the task.
+     * @return true if the task was successfully enqueued, false if the queue was full.
+     */
+    bool enqueue(std::unique_ptr<cann_task>&& item) {
+        size_t next_tail = (tail_ + 1) & mask_;
+
+        if (next_tail == head_) {
+            return false;
+        }
+
+        buffer_[tail_] = std::move(item);
+        std::atomic_thread_fence(std::memory_order_release);
+        tail_ = next_tail;
+
+        return true;
+    }
+
+    /**
+     * @brief Submits a task to the queue, and starts the worker thread if not already running.
+     *
+     * @param task Task to be submitted.
+     */
+    void submit_task(std::unique_ptr<cann_task>&& task) {
+        while(!enqueue(std::move(task))) {
+            std::this_thread::yield();
+            continue;
+        }
+
+        if (!running_) {
+            running_ = true;
+            thread_ = std::thread(&cann_task_queue::execute, this);
+        }
+
+    }
+
+    /**
+     * @brief Waits until the queue is completely empty and no tasks are being processed.
+     */
+    void wait() {
+        while (running_ && head_ != tail_) {
+            std::this_thread::yield();
+            continue;
+        }
+    }
+
+    /**
+     * @brief Stops the task queue and joins the worker thread.
+     */
+    void stop() {
+        running_ = false;
+        if (thread_.joinable()) {
+            thread_.join();
+        }
+    }
+
+private:
+    /**
+     * @brief Worker thread function that continuously dequeues and executes tasks.
+     */
+    void execute() {
+        ggml_cann_set_device(device_);
+
+        while (running_) {
+            if(head_ == tail_) {
+                std::this_thread::yield();
+                continue;
+            }
+
+            std::atomic_thread_fence(std::memory_order_acquire);
+            buffer_[head_]->run_task();
+            buffer_[head_].reset();
+            head_ = (head_ + 1) & mask_;
+        }
+    }
+
+    std::vector<std::unique_ptr<cann_task>> buffer_;
+    const size_t capacity_;
+    size_t mask_;
+    size_t head_;
+    size_t tail_;
+    bool running_;
+    std::thread thread_;
+    int32_t device_;
+};
+
+#ifdef USE_ACL_GRAPH
+struct ggml_graph_node_properties {
+    void * node_address;
+    ggml_op node_op;
+    int64_t ne[GGML_MAX_DIMS];
+    size_t nb[GGML_MAX_DIMS];
+    void * src_address[GGML_MAX_SRC];
+    int32_t op_params[GGML_MAX_OP_PARAMS / sizeof(int32_t)];
+};
+
+struct ggml_cann_graph {
+    ~ggml_cann_graph() {
+        if (graph != nullptr) {
+            ACL_CHECK(aclmdlRIDestroy(graph));
+        }
+    }
+
+    aclmdlRI graph = nullptr;
+
+    std::vector<ggml_graph_node_properties> ggml_graph_properties;
+};
+
+/**
+ * @brief LRU cache for managing ggml_cann_graph objects.
+ *
+ * This class maintains a list of shared_ptr to ggml_cann_graph objects
+ * and enforces a maximum capacity. It provides methods to push new graphs,
+ * move existing graphs to the front (most recently used), and clear the cache.
+ */
+struct ggml_cann_graph_lru_cache {
+    size_t capacity;  /**< Maximum number of graphs in the cache. */
+
+    std::list<ggml_cann_graph*> cache_list; /**< List storing cached graphs as raw pointers. */
+
+    ggml_cann_graph_lru_cache() {
+        capacity = parse_integer(get_env("GGML_CANN_GRAPH_CACHE_CAPACITY").value_or("12"));
+    }
+
+    /**
+     * @brief Push a new graph to the front of the cache.
+     * If the cache exceeds capacity, the least recently used graph is deleted.
+     * @param new_node Pointer to the new ggml_cann_graph to cache.
+     *        Ownership is transferred to the cache (cache will delete it).
+     */
+    void push(ggml_cann_graph* new_node) {
+        if (cache_list.size() >= capacity) {
+            ggml_cann_graph* old = cache_list.back();
+            cache_list.pop_back();
+            delete old; // free the old graph
+        }
+        cache_list.push_front(new_node);
+    }
+
+    /**
+     * @brief Move an existing graph to the front of the cache.
+     * @param node Pointer to the ggml_cann_graph to move.
+     */
+    void move_to_front(ggml_cann_graph* node) {
+        cache_list.remove(node);
+        cache_list.push_front(node);
+    }
+
+    /**
+     * @brief Clear all graphs from the cache (also frees memory).
+     */
+    void clear() {
+        for (auto ptr : cache_list) {
+            delete ptr;
+        }
+        cache_list.clear();
+    }
+
+    /**
+     * @brief Destructor that clears the cache and frees all cached graphs.
+     */
+    ~ggml_cann_graph_lru_cache() {
+        clear();
+    }
+};
+#endif  // USE_ACL_GRAPH
+
+struct ggml_cann_rope_cache {
+    ~ggml_cann_rope_cache() {
+        if(theta_scale_cache != nullptr) {
+            ACL_CHECK(aclrtFree(theta_scale_cache));
+        }
+        if(sin_cache != nullptr) {
+            ACL_CHECK(aclrtFree(sin_cache));
+        }
+        if(cos_cache != nullptr) {
+            ACL_CHECK(aclrtFree(cos_cache));
+        }
+    }
+
+    void* theta_scale_cache = nullptr;
+    int64_t theta_scale_length = 0;
+    // sin/cos cache, used only to accelerate first layer on each device
+    void* sin_cache = nullptr;
+    void* cos_cache = nullptr;
+    int64_t position_length = 0;
+    // Properties to check before reusing the sincos cache
+    bool cached = false;
+    float ext_factor = 0.0f;
+    float theta_scale = 0.0f;
+    float freq_scale = 0.0f;
+    float attn_factor = 0.0f;
+    bool is_neox = false;
+};
+
+struct ggml_cann_tensor_cache {
+    ~ggml_cann_tensor_cache() {
+        if(cache != nullptr) {
+            ACL_CHECK(aclrtFree(cache));
+        }
+    }
+
+    void* cache = nullptr;
+    int64_t size = 0;
+};
+
+/**
  * @brief Context for managing CANN backend operations.
  */
 struct ggml_backend_cann_context {
@@ -213,6 +467,18 @@ struct ggml_backend_cann_context {
     std::string name;                /**< Name of the device. */
     std::string description;         /**< Description of the device. */
     aclrtEvent copy_event = nullptr; /**< Event for managing copy operations. */
+#ifdef USE_ACL_GRAPH
+    /// Cached CANN ACL graph used for executing the current ggml computation graph.
+    ggml_cann_graph_lru_cache graph_lru_cache;
+    bool acl_graph_mode = true;
+#endif
+    cann_task_queue task_queue;
+    bool async_mode;
+    // Rope Cache
+    ggml_cann_rope_cache rope_cache;
+    // Constant Pool
+    ggml_cann_tensor_cache rms_norm_one_tensor_cache;
+    ggml_cann_tensor_cache rms_norm_zero_tensor_cache;
 
     aclrtStream streams[GGML_CANN_MAX_STREAMS] = {nullptr}; /**< Array of streams for the device. */
 
@@ -221,9 +487,20 @@ struct ggml_backend_cann_context {
      * @param device Device ID.
      */
     explicit ggml_backend_cann_context(int device)
-        : device(device), name("CANN" + std::to_string(device)) {
+        : device(device), name("CANN" + std::to_string(device)), task_queue(1024, device) {
         ggml_cann_set_device(device);
         description = aclrtGetSocName();
+
+        async_mode = parse_bool(get_env("GGML_CANN_ASYNC_MODE").value_or(""));
+        GGML_LOG_INFO("%s: device %d async operator submission is %s\n", __func__,
+            device, async_mode ? "ON" : "OFF");
+#ifdef USE_ACL_GRAPH
+        acl_graph_mode = parse_bool(get_env("GGML_CANN_ACL_GRAPH").value_or("on"));
+        GGML_LOG_INFO("%s: device %d execution mode is %s (%s)\n",
+              __func__, device,
+              acl_graph_mode ? "GRAPH" : "EAGER",
+              acl_graph_mode ? "acl graph enabled" : "acl graph disabled");
+#endif
     }
 
     /**
@@ -231,6 +508,7 @@ struct ggml_backend_cann_context {
      */
     ~ggml_backend_cann_context() {
         ggml_cann_set_device(device);
+        task_queue.stop();
         if (copy_event != nullptr) {
             ACL_CHECK(aclrtDestroyEvent(copy_event));
         }
@@ -248,7 +526,10 @@ struct ggml_backend_cann_context {
      */
     aclrtStream stream(int stream) {
         if (streams[stream] == nullptr) {
-            ggml_cann_set_device(device);
+            // If the device is not set here, destroying the stream later may cause a mismatch
+            // between the thread contexts where the stream was created and destroyed.
+            // However, I printed the device_id, thread_id, and stream, and they are all consistent.
+            ACL_CHECK(aclrtSetDevice(device));
             ACL_CHECK(aclrtCreateStream(&streams[stream]));
         }
         return streams[stream];

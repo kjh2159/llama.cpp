@@ -14,39 +14,54 @@ add_library(llama
             llama-batch.cpp
             llama-chat.cpp
             llama-context.cpp
+            llama-cparams.cpp
             llama-grammar.cpp
+            llama-graph.cpp
             llama-hparams.cpp
             llama-impl.cpp
+            llama-io.cpp
             llama-kv-cache.cpp
+            llama-kv-cache-iswa.cpp
+            llama-memory.cpp
+            llama-memory-hybrid.cpp
+            llama-memory-recurrent.cpp
             llama-mmap.cpp
             llama-model-loader.cpp
+            llama-model-saver.cpp
             llama-model.cpp
             llama-quant.cpp
             llama-sampling.cpp
             llama-vocab.cpp
-            unicode.h
-            unicode.cpp
             unicode-data.cpp
+            unicode.cpp
+            unicode.h
             )
 
 add_library(dvfs
-            hard/device.h
             hard/device.cpp
-            hard/dvfs.h
+            hard/device.h
             hard/dvfs.cpp
-            hard/record.h
+            hard/dvfs.h
             hard/record.cpp
-            hard/utils.h
+            hard/record.h
             hard/utils.cpp
+            hard/utils.h
             )
 
-target_include_directories(llama PUBLIC . ../include)
-target_compile_features   (llama PUBLIC cxx_std_17) # don't bump
+target_include_directories(llama PRIVATE .)
+target_include_directories(llama PUBLIC ../include)
+target_compile_features   (llama PRIVATE cxx_std_17) # don't bump
 target_link_libraries(llama PUBLIC ggml)
 
-target_include_directories(dvfs PUBLIC . .)
-target_compile_features   (dvfs PUBLIC cxx_std_17) # don't bump
+target_include_directories(dvfs PRIVATE .)
+target_include_directories(dvfs PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_compile_features   (dvfs PRIVATE cxx_std_17) # don't bump
 target_link_libraries(dvfs PUBLIC ggml)
+if (IGNITE_USE_SYSTEM_DVFS)
+    target_compile_definitions(dvfs PUBLIC IGNITE_USE_SYSTEM_DVFS=1)
+else()
+    target_compile_definitions(dvfs PUBLIC IGNITE_USE_SYSTEM_DVFS=0)
+endif()
 
 if (BUILD_SHARED_LIBS)
     set_target_properties(llama PROPERTIES POSITION_INDEPENDENT_CODE ON)
