@@ -81,7 +81,7 @@ autogen-*.md
 
 # Models
 
-# models/*
+models/*
 models-mnt
 !models/.editorconfig
 !models/ggml-vocab-*.gguf*
@@ -153,10 +153,3 @@ poetry.toml
 # Ignite
 !/examples/ignite/*
 !CMakeLists.txt
-
-# temporary
-!/scripts/jinja/*.txt
-!/models/templates/*.jinja
-models/qwen-1.5-0.5b-q4k.gguf
-models/qwen-3-0.6b-q4k.gguf
-!requirements.txt
