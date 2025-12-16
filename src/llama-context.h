@@ -10,6 +10,7 @@
 
 #include <map>
 #include <vector>
+#include <iostream>
 
 struct llama_model;
 class llama_batch_allocr;
@@ -202,6 +203,8 @@ public:
     // can reuse the llm_graph_result instance of the context (for example to update a memory module)
     llm_graph_result * get_gf_res_reserve() const;
 
+    static bool lp_eval_callback(struct ggml_tensor * t, bool ask, void * user_data);
+
     // returns the result of ggml_backend_sched_graph_compute_async execution
     ggml_status graph_compute(ggml_cgraph * gf, bool batched);
 
@@ -309,4 +312,13 @@ private:
     mutable int32_t n_eval   = 0; // number of eval calls
 
     mutable int32_t n_reused = 0; // number of times the previous graph was reused
+
+
+    // ignite: layer-pause
+    enum class lp_mha_key_t { none, attn_out, kqv_out };
+    bool lp_enable = true;
+    bool lp_is_prefill = false;
+    mutable bool seen_attn_out = false;
+    mutable bool seen_kqv_out = false;
+    mutable lp_mha_key_t lp_mha_key = lp_mha_key_t::none;
 };

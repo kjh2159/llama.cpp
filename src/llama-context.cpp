@@ -736,12 +736,20 @@ llm_graph_result * llama_context::process_ubatch(const llama_ubatch & ubatch, ll
         return nullptr;
     }
 
+    lp_is_prefill = (ubatch.n_tokens > 1);
+
     auto * res = gf_res_prev.get();
     auto * gf  = res->get_gf();
 
     // the new graph parameters
     // in order to correctly reuse a graph, it's full topology has to be uniquely determined by these parameters
     const auto gparams = graph_params(res, ubatch, mctx, gtype);
+    // by graph_params, node names are investigated
+    // from here, according to the node graph, pause position is set.
+    if (seen_attn_out)      lp_mha_key = lp_mha_key_t::attn_out;
+    else if (seen_kqv_out)  lp_mha_key = lp_mha_key_t::kqv_out;
+    else                    lp_mha_key = lp_mha_key_t::none;
+    
 
     if (!graph_reuse_disable && res->can_reuse(gparams)) {
         //LLAMA_LOG_DEBUG("%s: reusing previous graph\n", __func__);
@@ -1438,6 +1446,33 @@ llm_graph_params llama_context::graph_params(
     };
 }
 
+// layer pause callback function
+// this callback is called whenever node operation is done.
+bool llama_context::lp_eval_callback(struct ggml_tensor* t, bool ask, void* user_data){
+    auto * ctx = static_cast<llama_context *>(user_data);
+
+    if(ask) return true;
+
+    if (!ctx->lp_enable || !ctx->lp_is_prefill) return true;
+
+    const char * n = ggml_get_name(t);
+    if (!n || !n[0]) return true;
+
+    // inject in MHA and FFN.
+    // MHA
+    if (strncmp(n, "attn_out", 8)  == 0 && ctx->lp_mha_key == lp_mha_key_t::attn_out) {
+        std::cout << std::flush << "<mha>";
+    }  else if (strncmp(n, "kqv_out", 7)  == 0 && ctx->lp_mha_key == lp_mha_key_t::kqv_out) {
+        std::cout << std::flush << "<kqv>";
+    }
+    // FFN
+    if (strncmp(n, "ffn_out", 7) == 0 || strncmp(n, "ffn_mlp", 7) == 0) {
+        std::cout << std::flush << "<ffn>";
+    }
+
+    return true;
+}
+
 ggml_status llama_context::graph_compute(
             ggml_cgraph * gf,
                    bool   batched) {
@@ -1457,6 +1492,8 @@ ggml_status llama_context::graph_compute(
         set_n_threads_fn.second(set_n_threads_fn.first, n_threads);
     }
 
+    // register lp_eval_callback function to eval scheduler (inject into only prefill phase)
+    ggml_backend_sched_set_eval_callback(sched.get(), lp_eval_callback, this);
     auto status = ggml_backend_sched_graph_compute_async(sched.get(), gf);
     if (status != GGML_STATUS_SUCCESS) {
         LLAMA_LOG_ERROR("%s: ggml_backend_sched_graph_compute_async failed with error %d\n", __func__, status);
@@ -1474,6 +1511,10 @@ llm_graph_cb llama_context::graph_get_cb() const {
         } else {
             ggml_set_name(cur, name);
         }
+
+        // check existing attention nodes
+        if (strcmp(name, "attn_out") == 0) seen_attn_out = true; //e.g., llama3.2
+        if (strcmp(name, "kqv_out") == 0) seen_kqv_out = true; //e.g., qwen1.5
 
         if (!cparams.offload_kqv) {
             if (strcmp(name, "kqv_merged_cont") == 0) {
