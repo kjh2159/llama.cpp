@@ -644,11 +644,17 @@ int main(int argc, char ** argv) {
             }
         }
     }
+
 // ------------------------------------------------
     // timer variables
     std::chrono::steady_clock::time_point inference_start_time;
     bool inference_started = false;
+    // prefill/decode detector variables
+    bool generation_started = false;
+    bool prefill_active = false;
+    bool decode_active = false;
 // ------------------------------------------------
+    
     smpl = common_sampler_init(model, sparams);
     if (!smpl) {
         LOG_ERR("%s: failed to initialize sampling subsystem\n", __func__);
@@ -855,6 +861,22 @@ int main(int argc, char ** argv) {
 
                 LOG_DBG("eval: %s\n", string_from(ctx, embd).c_str());
 
+// ------------------------------------------------
+                // prefill/decode detector
+                if (!generation_started) {
+                    if (!prefill_active) {  
+                        prefill_active = true; decode_active = false;
+                        std::cout << std::flush << "<prefill>";
+                    }
+                } else {
+                    if (!decode_active) {  
+                        prefill_active = false; decode_active = true;
+                        std::cout << std::flush << "<decode>";
+                    }
+                }
+// ------------------------------------------------
+
+
                 if (llama_decode(ctx, llama_batch_get_one(&embd[i], n_eval))) {
                     LOG_ERR("%s : failed to eval\n", __func__);
                     return 1;
@@ -878,6 +900,11 @@ int main(int argc, char ** argv) {
         embd.clear();
 
         if ((int) embd_inp.size() <= n_consumed && !is_interacting) {
+// ------------------------------------------------
+            // now, generation starts
+            generation_started = true;
+// ------------------------------------------------
+            
             // optionally save the session on first sample (for faster prompt loading next time)
             if (!path_session.empty() && need_to_save_session && !params.prompt_cache_ro) {
                 need_to_save_session = false;
@@ -886,6 +913,7 @@ int main(int argc, char ** argv) {
                 LOG_DBG("saved session to %s\n", path_session.c_str());
             }
 
+            // token is generated with logits inferred from llama_decode
             const llama_token id = common_sampler_sample(smpl, ctx, -1);
 
             common_sampler_accept(smpl, id, /* accept_grammar= */ true);
@@ -926,7 +954,6 @@ int main(int argc, char ** argv) {
         if (input_echo && display) {
             for (auto id : embd) {
                 const std::string token_str = common_token_to_piece(ctx, id, params.special);
-                //std::this_thread::sleep_for(std::chrono::duration<double>(dp_itvl));
 
                 // Console/Stream Output
                 LOG("%s", token_str.c_str());
@@ -1023,9 +1050,9 @@ int main(int argc, char ** argv) {
                 }
             }
 
-            // -------------------------------
-            // Print inference time for previous question
             if ((n_past > 0 || waiting_for_first_input) && is_interacting) {
+// -------------------------------
+                // Print inference time for previous question
                 if (inference_started) {
                     auto inference_end_time = std::chrono::steady_clock::now();
                     auto inference_duration = std::chrono::duration_cast<std::chrono::milliseconds>(inference_end_time - inference_start_time).count();
@@ -1038,7 +1065,7 @@ int main(int argc, char ** argv) {
                     // common_sampler_free(smpl);
                     inference_started = false;
                 }
-            // -------------------------------
+// -------------------------------
                 LOG_DBG("waiting for user input\n");
 
                 if (params.conversation_mode) {
@@ -1067,7 +1094,8 @@ int main(int argc, char ** argv) {
                 //     buffer += line;
                 // } while (another_line);
 
-            // ------------------------------------------------
+// ------------------------------------------------
+                // TODO: support non-json file mode (user direct input mode)
                 // Use next question from JSON file
                 if (current_question_index < json_questions.size()) {
                     buffer = "/no_think ";
@@ -1083,7 +1111,7 @@ int main(int argc, char ** argv) {
                     LOG_INF("No more questions available in %s. Exiting interactive mode.\n", json_path.c_str());
                     break;
                 }
-            // ------------------------------------------------
+// ------------------------------------------------
 
                 // done taking input, reset color
                 console::set_display(console::reset);
@@ -1140,6 +1168,8 @@ int main(int argc, char ** argv) {
                     embd_inp.insert(embd_inp.end(), line_pfx.begin(), line_pfx.end());
                     embd_inp.insert(embd_inp.end(), line_inp.begin(), line_inp.end());
                     embd_inp.insert(embd_inp.end(), line_sfx.begin(), line_sfx.end());
+
+                    generation_started = false;
 
                     if (params.verbose_prompt) {
                         LOG_INF("%s: number of tokens in prompt = %zu\n", __func__, embd_inp.size() - original_size);

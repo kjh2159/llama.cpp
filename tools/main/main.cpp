@@ -332,11 +332,6 @@ int main(int argc, char ** argv) {
         return 1;
     }
 
-    // TODO: delete all this file for the flags.
-    bool generation_started = false;
-    bool prefill_active = false;
-    bool decode_active = false;
-
     // debug message about similarity of saved session, if applicable
     size_t n_matching_session_tokens = 0;
     if (!session_tokens.empty()) {
@@ -673,19 +668,6 @@ int main(int argc, char ** argv) {
 
                 LOG_DBG("eval: %s\n", string_from(ctx, embd).c_str());
 
-                //
-                if (!generation_started) {
-                    if (!prefill_active) {  
-                        prefill_active = true; decode_active = false;
-                        std::cout << std::flush << "<prefill>";
-                    }
-                } else {
-                    if (!decode_active) {  
-                        prefill_active = false; decode_active = true;
-                        std::cout << std::flush << "<decode>";
-                    }
-                }
-
                 if (llama_decode(ctx, llama_batch_get_one(&embd[i], n_eval))) {
                     LOG_ERR("%s : failed to eval\n", __func__);
                     return 1;
@@ -718,7 +700,6 @@ int main(int argc, char ** argv) {
             }
 
             const llama_token id = common_sampler_sample(smpl, ctx, -1);
-            generation_started = true;
 
             common_sampler_accept(smpl, id, /* accept_grammar= */ true);
 
@@ -938,8 +919,6 @@ int main(int argc, char ** argv) {
                     embd_inp.insert(embd_inp.end(), line_pfx.begin(), line_pfx.end());
                     embd_inp.insert(embd_inp.end(), line_inp.begin(), line_inp.end());
                     embd_inp.insert(embd_inp.end(), line_sfx.begin(), line_sfx.end());
-
-                    generation_started = false;
 
                     if (params.verbose_prompt) {
                         LOG_INF("%s: number of tokens in prompt = %zu\n", __func__, embd_inp.size() - original_size);
