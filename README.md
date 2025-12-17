@@ -37,4 +37,10 @@ The main focus of *IGNITE* for on-device inference is based on `llama-cli`, guid
 
 ## Quick start (*IGNITE*)
 
+### Build
+
+```sh
+cd scripts && sh build.sh && cd ..
+```
+
 *This will be filled up. Please wait.*
