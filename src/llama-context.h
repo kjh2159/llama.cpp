@@ -4,6 +4,7 @@
 #include "llama-cparams.h"
 #include "llama-graph.h"
 #include "llama-adapter.h"
+#include "llama-ignite.h"
 
 #include "ggml-cpp.h"
 #include "ggml-opt.h"
@@ -236,6 +237,7 @@ private:
     llama_cparams       cparams;
     llama_adapter_cvec  cvec;
     llama_adapter_loras loras;
+    llama_igparams      igparams;
 
     llama_cross cross; // TODO: tmp for handling cross-attention - need something better probably
 
@@ -321,4 +323,6 @@ private:
     mutable bool seen_attn_out = false;
     mutable bool seen_kqv_out = false;
     mutable lp_mha_key_t lp_mha_key = lp_mha_key_t::none;
+    friend void llama_ignite_set_active(struct llama_context * ctx, bool active);
+    friend bool llama_ignite_get_active(struct llama_context * ctx);
 };

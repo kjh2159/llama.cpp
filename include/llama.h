@@ -1395,6 +1395,11 @@ extern "C" {
             ggml_opt_epoch_callback   callback_train,
             ggml_opt_epoch_callback   callback_eval);
 
+    
+    // llama-ignite
+    LLAMA_API void llama_ignite_set_active(struct llama_context * ctx, bool active);
+    LLAMA_API bool llama_ignite_get_active(struct llama_context * ctx);
+
 #ifdef __cplusplus
 }
 #endif

@@ -289,6 +289,7 @@ struct common_params {
     int dp_itvl=0;
     int lp=0;
     int tp=0;
+    bool is_ignite_active = false;
 
     int32_t n_predict             =    -1; // new tokens to predict
     int32_t n_ctx                 =  4096; // context size

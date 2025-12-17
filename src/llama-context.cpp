@@ -1446,6 +1446,7 @@ llm_graph_params llama_context::graph_params(
     };
 }
 
+//--------------------------------------------------
 // layer pause callback function
 // this callback is called whenever node operation is done.
 bool llama_context::lp_eval_callback(struct ggml_tensor* t, bool ask, void* user_data){
@@ -1472,6 +1473,7 @@ bool llama_context::lp_eval_callback(struct ggml_tensor* t, bool ask, void* user
 
     return true;
 }
+//--------------------------------------------------
 
 ggml_status llama_context::graph_compute(
             ggml_cgraph * gf,
@@ -1491,9 +1493,10 @@ ggml_status llama_context::graph_compute(
     for (const auto & set_n_threads_fn : set_n_threads_fns) {
         set_n_threads_fn.second(set_n_threads_fn.first, n_threads);
     }
-
+//--------------------------------------------------
     // register lp_eval_callback function to eval scheduler (inject into only prefill phase)
-    ggml_backend_sched_set_eval_callback(sched.get(), lp_eval_callback, this);
+    if (igparams.is_ignite_active) ggml_backend_sched_set_eval_callback(sched.get(), lp_eval_callback, this);
+//--------------------------------------------------
     auto status = ggml_backend_sched_graph_compute_async(sched.get(), gf);
     if (status != GGML_STATUS_SUCCESS) {
         LLAMA_LOG_ERROR("%s: ggml_backend_sched_graph_compute_async failed with error %d\n", __func__, status);

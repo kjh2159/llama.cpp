@@ -218,6 +218,7 @@ int main(int argc, char ** argv) {
 
 // The IGNNITE_USE_SYSTEM_DVFS option is valid only on mobile devices
 #if IGNITE_USE_SYSTEM_DVFS
+    params.is_ignite_active = true;
 // --------------------------------------------------
 //  Record '_infer_' initialization
     std::ofstream file(output_path, std::ios::app);

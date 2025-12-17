@@ -19,6 +19,7 @@ add_library(llama
             llama-graph.cpp
             llama-hparams.cpp
             llama-impl.cpp
+            llama-ignite.cpp
             llama-io.cpp
             llama-kv-cache.cpp
             llama-kv-cache-iswa.cpp

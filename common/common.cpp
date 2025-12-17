@@ -929,6 +929,7 @@ struct common_init_result common_init_from_params(common_params & params) {
     auto cparams = common_context_params_to_llama(params);
 
     llama_context * lctx = llama_init_from_model(model, cparams);
+    llama_ignite_set_active(lctx, params.is_ignite_active);
     if (lctx == NULL) {
         LOG_ERR("%s: failed to create context with model '%s', try reducing --n-gpu-layers if you're running out of VRAM\n",
             __func__, params.model.path.c_str());
