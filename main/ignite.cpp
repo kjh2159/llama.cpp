@@ -580,10 +580,10 @@ int main(int argc, char ** argv) {
     size_t current_question_index = 0;
     if (params.interactive) {
         json_questions = loadQuestions(json_path);
-        if (json_questions.empty()) {
-            LOG_ERR("No questions loaded from %s. Exiting interactive mode.\n", json_path.c_str());
-            return 1;
-        }
+        // if (json_questions.empty()) {
+        //     LOG_ERR("No questions loaded from %s. Exiting interactive mode.\n", json_path.c_str());
+        //     return 1;
+        // }
     }
     // JSON questions load done
 //------------------------------------------------
@@ -1087,17 +1087,20 @@ int main(int argc, char ** argv) {
                 console::set_display(console::user_input);
                 display = params.display_prompt;
 
-                // std::string line;
-                // bool another_line = true;
-                // do {
-                //     another_line = console::readline(line, params.multiline_input);
-                //     buffer += line;
-                // } while (another_line);
-
 // ------------------------------------------------
-                // TODO: support non-json file mode (user direct input mode)
-                // Use next question from JSON file
-                if (current_question_index < json_questions.size()) {
+                // seamless user-input/json-query mode 
+                if (json_questions.size() == 0){
+                    // 1. user-input mode
+                    std::string line;
+                    bool another_line = true;
+                    do {
+                        another_line = console::readline(line, params.multiline_input);
+                        buffer += line;
+                    } while (another_line);
+                } else if (current_question_index < json_questions.size()) {
+                    // 2. json-query mode
+                    // Use next question from JSON file
+                    // TODO: apply seamless think mode only Qwen3.
                     buffer = "/no_think ";
                     buffer += json_questions[current_question_index++];
                     ctx_kv_cache_clear(ctx);
