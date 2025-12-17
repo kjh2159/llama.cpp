@@ -69,12 +69,10 @@ cd scripts && sh build.sh && cd ..
 ```sh
 ./build/bin/ignite \
     -m models/qwen-1.5-0.5b-chat-q4k.gguf \
-    -p "You're a helpful assistant." \
     -cnv \
     --temp 0 \
     --top-k 1 \
     --threads 1 \
-    --device-name Pixel9 \
     --output-path outputs/hotpot_0_0.csv \
     --json-path dataset/hotpot_qa_30.json
 ```
