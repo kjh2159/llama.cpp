@@ -37,10 +37,46 @@ The main focus of *IGNITE* for on-device inference is based on `llama-cli`, guid
 
 ## Quick start (*IGNITE*)
 
-### Build
+### Model download
+
+```sh
+python downloader.py
+```
+Through this file, you can download models, which are pre-selected to evaluate themselves on *IGNITE*.
+If there is no preferred model, you can download and run your own gguf models also.
+
+
+### Build (on-device)
+
+```sh
+cd scripts && sh build-android.sh && cd ..
+```
+
+### Run (on-device)
+
+```sh
+chmod +x scripts-termux/run.sh
+su -c "taskset f0 sh scripts-termux/run.sh"
+```
+
+### Build (Linux)
 
 ```sh
 cd scripts && sh build.sh && cd ..
+```
+
+### Run (Linux)
+```sh
+./build/bin/ignite \
+    -m models/qwen-1.5-0.5b-chat-q4k.gguf \
+    -p "You're a helpful assistant." \
+    -cnv \
+    --temp 0 \
+    --top-k 1 \
+    --threads 1 \
+    --device-name Pixel9 \
+    --output-path outputs/hotpot_0_0.csv \
+    --json-path dataset/hotpot_qa_30.json
 ```
 
 *This will be filled up. Please wait.*
