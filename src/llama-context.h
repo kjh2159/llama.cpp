@@ -12,6 +12,8 @@
 #include <map>
 #include <vector>
 #include <iostream>
+#include <chrono>
+#include <thread>
 
 struct llama_model;
 class llama_batch_allocr;
@@ -325,4 +327,6 @@ private:
     mutable lp_mha_key_t lp_mha_key = lp_mha_key_t::none;
     friend void llama_ignite_set_active(struct llama_context * ctx, bool active);
     friend bool llama_ignite_get_active(struct llama_context * ctx);
+    friend void llama_ignite_set_layer_pause(struct llama_context * ctx,  uint16_t ms);
+    friend uint16_t llama_ignite_get_layer_pause(struct llama_context * ctx);
 };

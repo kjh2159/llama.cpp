@@ -370,6 +370,16 @@ void common_init() {
     LOG_INF("build: %d (%s) with %s for %s%s\n", LLAMA_BUILD_NUMBER, LLAMA_COMMIT, LLAMA_COMPILER, LLAMA_BUILD_TARGET, build_type);
 }
 
+
+//--------------------------------
+// ignite init
+void common_ignite_init(llama_context * ctx, common_params & params) {
+    if(!ctx) return;
+    llama_ignite_set_active(ctx, params.is_ignite_active);
+    llama_ignite_set_layer_pause(ctx, params.lp);
+}
+//--------------------------------
+
 std::string common_params_get_system_info(const common_params & params) {
     std::ostringstream os;
 
@@ -929,7 +939,7 @@ struct common_init_result common_init_from_params(common_params & params) {
     auto cparams = common_context_params_to_llama(params);
 
     llama_context * lctx = llama_init_from_model(model, cparams);
-    llama_ignite_set_active(lctx, params.is_ignite_active);
+    common_ignite_init(lctx, params);
     if (lctx == NULL) {
         LOG_ERR("%s: failed to create context with model '%s', try reducing --n-gpu-layers if you're running out of VRAM\n",
             __func__, params.model.path.c_str());

@@ -1462,13 +1462,16 @@ bool llama_context::lp_eval_callback(struct ggml_tensor* t, bool ask, void* user
     // inject in MHA and FFN.
     // MHA
     if (strncmp(n, "attn_out", 8)  == 0 && ctx->lp_mha_key == lp_mha_key_t::attn_out) {
-        std::cout << std::flush << "<mha>";
+        std::cout << std::flush << "<mha:" << ctx->igparams.lp << ">";
+        // std::this_thread::sleep_for(std::chrono::milliseconds(ctx->igparams.lp));
     }  else if (strncmp(n, "kqv_out", 7)  == 0 && ctx->lp_mha_key == lp_mha_key_t::kqv_out) {
-        std::cout << std::flush << "<kqv>";
+        std::cout << std::flush << "<kqv" << ctx->igparams.lp << ">";
+        // std::this_thread::sleep_for(std::chrono::milliseconds(ctx->igparams.lp));
     }
     // FFN
     if (strncmp(n, "ffn_out", 7) == 0 || strncmp(n, "ffn_mlp", 7) == 0) {
-        std::cout << std::flush << "<ffn>";
+        std::cout << std::flush << "<ffn" << ctx->igparams.lp << ">";
+        // std::this_thread::sleep_for(std::chrono::milliseconds(ctx->igparams.lp));
     }
 
     return true;

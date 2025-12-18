@@ -525,6 +525,7 @@ struct common_params {
 // call once at the start of a program if it uses libcommon
 // initializes the logging system and prints info about the build
 void common_init();
+void common_ignite_init(llama_context * ctx, common_params & params);
 
 std::string common_params_get_system_info(const common_params & params);
 
