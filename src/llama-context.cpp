@@ -699,6 +699,13 @@ void llama_context::set_adapter_lora(
     loras[adapter] = scale;
 }
 
+void llama_context::set_ignite_params(
+            const llama_igparams * cfg) {
+
+            LLAMA_LOG_DEBUG("%s: call\n", __func__);
+            this->igparams = *cfg;
+}
+
 bool llama_context::rm_adapter_lora(
             llama_adapter_lora * adapter) {
     LLAMA_LOG_DEBUG("%s: adapter = %p\n", __func__, (void *) adapter);
@@ -1462,16 +1469,16 @@ bool llama_context::lp_eval_callback(struct ggml_tensor* t, bool ask, void* user
     // inject in MHA and FFN.
     // MHA
     if (strncmp(n, "attn_out", 8)  == 0 && ctx->lp_mha_key == lp_mha_key_t::attn_out) {
-        std::cout << std::flush << "<mha:" << ctx->igparams.lp << ">";
-        // std::this_thread::sleep_for(std::chrono::milliseconds(ctx->igparams.lp));
+        std::cout << std::flush << "<mha:" << ctx->igparams.layer_pause << ">";
+        // std::this_thread::sleep_for(std::chrono::milliseconds(ctx->igparams.layer_pause));
     }  else if (strncmp(n, "kqv_out", 7)  == 0 && ctx->lp_mha_key == lp_mha_key_t::kqv_out) {
-        std::cout << std::flush << "<kqv" << ctx->igparams.lp << ">";
-        // std::this_thread::sleep_for(std::chrono::milliseconds(ctx->igparams.lp));
+        std::cout << std::flush << "<kqv" << ctx->igparams.layer_pause << ">";
+        // std::this_thread::sleep_for(std::chrono::milliseconds(ctx->igparams.layer_pause));
     }
     // FFN
     if (strncmp(n, "ffn_out", 7) == 0 || strncmp(n, "ffn_mlp", 7) == 0) {
-        std::cout << std::flush << "<ffn" << ctx->igparams.lp << ">";
-        // std::this_thread::sleep_for(std::chrono::milliseconds(ctx->igparams.lp));
+        std::cout << std::flush << "<ffn" << ctx->igparams.layer_pause << ">";
+        // std::this_thread::sleep_for(std::chrono::milliseconds(ctx->igparams.layer_pause));
     }
 
     return true;

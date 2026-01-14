@@ -3,6 +3,7 @@
 #define RECORD
 
 #include "dvfs.h"
+#include "utils.h"
 
 #include <stdlib.h>
 
@@ -23,8 +24,8 @@
 
 
 // internal static functions
-static std::vector<std::string> split_string(const std::string& str);
-static std::string execute_cmd(const char* cmd);
+// static std::vector<std::string> split_string(const std::string& str);
+// static std::string execute_cmd(const char* cmd);
 
 //test
 void get_cpu_info();

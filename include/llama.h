@@ -61,6 +61,7 @@ extern "C" {
     struct llama_model;
     struct llama_context;
     struct llama_sampler;
+    struct llama_ignite; // for the future
 
     typedef struct llama_memory_i * llama_memory_t;
 
@@ -382,6 +383,54 @@ extern "C" {
 
     // lora adapter
     struct llama_adapter_lora;
+
+    // used in IGNITE
+    typedef struct llama_igparams {
+    // graph internal parameters
+        bool is_ignite_active;               // ignite active status
+        uint16_t layer_pause;      // per-layer pause in milliseconds
+
+    // graph external parameters
+        // basic additional parameters
+        bool strict_limit;
+        bool enable_thinking;
+
+        // llm plane
+        int phase_pause; // ms
+        int token_pause; // ms
+        int query_interval; // ms
+        bool prefill_phase; // prefill phase or not
+        double prefill_speed; // tokens/s
+        double decode_speed; // tokens/s
+
+        // basic measure configs
+        int csv_limit;       // limit of CSV questions (0=no limit) // deprecated in future
+        const char * json_path; // deprecated in future
+        const char * output_csv_path; // deprecated in future
+        const char * input_path; // path = dir/file.ext
+        const char * output_dir;
+        const char * output_path_hard;
+        const char * output_path_infer;
+
+        // [OPT. 1] resource plane (static ignite)
+        const char * device_name;
+        int cpu_clk_idx_p; // prefill + cpu
+        int ram_clk_idx_p; // prefill + ram
+        int cpu_clk_idx_d; // decode + cpu
+        int ram_clk_idx_d; // decode + ram
+        bool fixed_config;
+
+        // [OPT. 2] resource plane (agent ignite)
+        double time_slot; // s
+        double temp_threshold; // Celsius
+        double temp_history[64]; // temperature history
+        int temp_cap; // max length of temperature history
+        double temp_alpha; // for EMA
+        int max_cpu_clk_idx; // fixed by device
+        int cur_cpu_clk_idx; // dynamic
+        int max_ram_clk_idx; // fixed by device
+        int cur_ram_clk_idx; // dynamic
+    } llama_igparams;
 
     // Helpers for getting default parameters
     // TODO: update API to start accepting pointers to params structs (https://github.com/ggml-org/llama.cpp/discussions/9172)
@@ -1401,6 +1450,7 @@ extern "C" {
     LLAMA_API bool llama_ignite_get_active(struct llama_context * ctx);
     LLAMA_API void llama_ignite_set_layer_pause(struct llama_context * ctx,  uint16_t ms);
     LLAMA_API uint16_t llama_ignite_get_layer_pause(struct llama_context * ctx);
+    LLAMA_API bool init_ignite_params(struct llama_context * ctx, llama_igparams* igparams);
 
 #ifdef __cplusplus
 }

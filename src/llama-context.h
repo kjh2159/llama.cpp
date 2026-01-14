@@ -88,6 +88,9 @@ struct llama_context {
             llama_adapter_lora * adapter,
             float scale);
 
+    void set_ignite_params(
+            const llama_igparams * cfg);
+
     bool rm_adapter_lora(
             llama_adapter_lora * adapter);
 

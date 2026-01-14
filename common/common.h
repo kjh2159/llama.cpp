@@ -274,23 +274,6 @@ struct lr_opt {
 struct ggml_opt_optimizer_params common_opt_lr_pars(void * userdata);
 
 struct common_params {
-    // for stream
-    std::string json_path = "questions.json";
-    std::string csv_path;    // CSV file path
-    std::string output_csv_path;
-    int csv_limit = 0;       // limit of CSV questions (0=no limit)
-
-    // for dvfs
-    std::string device_name;
-    int cpu_freq_idx = 0;
-    int ram_freq_idx = 0;
-
-    // for ignite
-    int dp_itvl=0;
-    int lp=0;
-    int tp=0;
-    bool is_ignite_active = false;
-
     int32_t n_predict             =    -1; // new tokens to predict
     int32_t n_ctx                 =  4096; // context size
     int32_t n_batch               =  2048; // logical batch size for prompt processing (must be >=32 to use BLAS)
@@ -520,6 +503,49 @@ struct common_params {
     // return false from callback to abort model loading or true to continue
     llama_progress_callback load_progress_callback = NULL;
     void *                  load_progress_callback_user_data = NULL;
+
+    // basic additional parameters
+    bool strict_limit = false;
+    bool enable_thinking = false;
+
+    // llm plane
+    int phase_pause = 0; // ms
+    int token_pause = 0; // ms
+    int layer_pause = 0; // ms
+    int query_interval = 0; // ms
+    bool prefill_phase = true; // prefill phase or not
+    double prefill_speed = 0.0; // tokens/s
+    double decode_speed = 0.0; // tokens/s
+    bool is_ignite_active = false;
+
+    // basic measure configs
+    int csv_limit = 0;       // limit of CSV questions (0=no limit) // deprecated in future
+    std::string csv_path = ""; // path to CSV questions (empty=none) // deprecated in future
+    std::string json_path = "questions.json"; // deprecated in future
+    std::string output_csv_path; // deprecated in future
+    std::string input_path = ""; // path = dir/file.ext
+    std::string output_dir = "";
+    std::string output_path_hard = "";
+    std::string output_path_infer = "";
+    
+    // [OPT. 1] resource plane (static ignite)
+    std::string device_name;
+    int cpu_clk_idx_p = 0; // prefill + cpu
+    int ram_clk_idx_p = 0; // prefill + ram
+    int cpu_clk_idx_d = 0; // decode + cpu
+    int ram_clk_idx_d = 0; // decode + ram
+    bool fixed_config = false;
+
+    // [OPT. 2] resource plane (agent ignite)
+    double time_slot = 0.5; // s
+    double temp_threshold = 80.0; // Celsius
+    std::vector<double> temp_history = {}; // temperature history
+    int temp_cap = 10; // max length of temperature history
+    double temp_alpha = 0.6; // for EMA
+    int max_cpu_clk_idx = 0; // fixed by device
+    int cur_cpu_clk_idx = 0; // dynamic
+    int max_ram_clk_idx = 0; // fixed by device
+    int cur_ram_clk_idx = 0; // dynamic
 };
 
 // call once at the start of a program if it uses libcommon

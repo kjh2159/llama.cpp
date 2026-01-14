@@ -375,8 +375,46 @@ void common_init() {
 // ignite init
 void common_ignite_init(llama_context * ctx, common_params & params) {
     if(!ctx) return;
+
+    llama_igparams ig{}; //tmp
+  // graph internal parameters
     llama_ignite_set_active(ctx, params.is_ignite_active);
-    llama_ignite_set_layer_pause(ctx, params.lp);
+    llama_ignite_set_layer_pause(ctx, params.layer_pause);
+
+  // graph external parameters
+    ig.layer_pause = params.layer_pause;
+    ig.phase_pause    = params.phase_pause;
+    ig.token_pause    = params.token_pause;
+    ig.query_interval = params.query_interval;
+    ig.prefill_phase  = params.prefill_phase;
+    ig.prefill_speed  = params.prefill_speed;
+    ig.decode_speed   = params.decode_speed;
+
+    // TODO: deprecated in future (extract into API level)
+    ig.input_path        = params.input_path.c_str();
+    ig.output_dir        = params.output_dir.c_str();
+    ig.output_path_hard  = params.output_path_hard.c_str();
+    ig.output_path_infer = params.output_path_infer.c_str();
+
+    ig.cpu_clk_idx_p = params.cpu_clk_idx_p;
+    ig.ram_clk_idx_p = params.ram_clk_idx_p;
+    ig.cpu_clk_idx_d = params.cpu_clk_idx_d;
+    ig.ram_clk_idx_d = params.ram_clk_idx_d;
+    ig.fixed_config  = params.fixed_config;
+
+    ig.time_slot       = params.time_slot;
+    ig.temp_threshold  = params.temp_threshold;
+    ig.temp_cap        = params.temp_cap;
+    ig.temp_alpha      = params.temp_alpha;
+    ig.max_cpu_clk_idx = params.max_cpu_clk_idx;
+    ig.cur_cpu_clk_idx = params.cur_cpu_clk_idx;
+    ig.max_ram_clk_idx = params.max_ram_clk_idx;
+    ig.cur_ram_clk_idx = params.cur_ram_clk_idx;
+
+    // transfer to llama context
+    init_ignite_params(ctx, &ig);
+
+    return;
 }
 //--------------------------------
 

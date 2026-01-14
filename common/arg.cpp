@@ -1824,20 +1824,36 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
     ).set_examples({LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_MAIN}));
 
     add_opt(common_arg(
-        {"--cpu-freq"}, "CF",
+        {"--cpu-p"}, "CF",
         "set cpu frequency with frequency index",
         [](common_params & params, int value) {
-            params.cpu_freq_idx = value;
+            params.cpu_clk_idx_p = value;
         }
     ).set_examples({LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_MAIN}));
 
     add_opt(common_arg(
-        {"--ram-freq"}, "RF",
+        {"--ram-p"}, "RF",
         "set ram frequency with frequency index",
         [](common_params & params, int value) {
-            params.ram_freq_idx = value;
+            params.ram_clk_idx_p = value;
         }
-    ).set_examples({LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_MAIN}));
+    ).set_examples({LLAMA_EXAMPLE_MAIN}));
+
+    add_opt(common_arg(
+        {"--cpu-d"}, "CF",
+        "set cpu frequency with frequency index",
+        [](common_params & params, int value) {
+            params.cpu_clk_idx_d = value;
+        }
+    ).set_examples({LLAMA_EXAMPLE_MAIN}));
+
+    add_opt(common_arg(
+        {"--ram-d"}, "RF",
+        "set ram frequency with frequency index",
+        [](common_params & params, int value) {
+            params.ram_clk_idx_d = value;
+        }
+    ).set_examples({LLAMA_EXAMPLE_MAIN}));
 
    add_opt(common_arg(
         {"--json-path"}, "JS",
@@ -1851,7 +1867,7 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
         {"--phase-pause"}, "PP",
         "phase pause time for ignite (ms)",
         [](common_params &params, const int value) {
-            params.dp_itvl = value;
+            params.phase_pause = value;
         }
     ).set_examples({LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_MAIN}));
     
@@ -1859,7 +1875,7 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
         {"--layer-pause"}, "LP",
         "layer pause time for ignite (ms)",
         [](common_params &params, const int value) {
-            params.lp = value;
+            params.layer_pause = value;
         }
     ).set_examples({LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_MAIN}));
     
@@ -1867,7 +1883,7 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
         {"--token-pause"}, "TP",
         "output token pause time for ignite (ms)",
         [](common_params &params, const int value) {
-            params.tp = value;
+            params.token_pause = value;
         }
     ).set_examples({LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_MAIN}));
 

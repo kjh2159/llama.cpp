@@ -1,39 +1,39 @@
 #include "record.h"
 #include <algorithm>
 
-static std::vector<std::string> split_string(const std::string& str){
-    // initialization
-    std::vector<std::string> result;
-    // conversion to stream string
-    std::istringstream iss(str);
-    std::string value; // splited value
+// static std::vector<std::string> split_string(const std::string& str){
+//     // initialization
+//     std::vector<std::string> result;
+//     // conversion to stream string
+//     std::istringstream iss(str);
+//     std::string value; // splited value
 
-    while (iss >> value){
-        result.push_back(value); // accumulation
-    }
+//     while (iss >> value){
+//         result.push_back(value); // accumulation
+//     }
 
-    return result;
-}
+//     return result;
+// }
 
 
-static std::string execute_cmd(const char* cmd){
-    // command execution
-    FILE* pipe = popen(cmd, "r");
+// static std::string execute_cmd(const char* cmd){
+//     // command execution
+//     FILE* pipe = popen(cmd, "r");
     
-    // check pipe open
-    if (!pipe) { std::cerr << "failed to pipe open (record.h)\n"; return "";}
+//     // check pipe open
+//     if (!pipe) { std::cerr << "failed to pipe open (record.h)\n"; return "";}
 
-    // get output from buffer
-    std::ostringstream result;
-    char buff[8192];
-    while (fgets(buff, sizeof(buff), pipe) != nullptr){
-        result << buff;
-    }
+//     // get output from buffer
+//     std::ostringstream result;
+//     char buff[8192];
+//     while (fgets(buff, sizeof(buff), pipe) != nullptr){
+//         result << buff;
+//     }
 
-    // close pipe
-    pclose(pipe); 
-    return result.str();
-}
+//     // close pipe
+//     pclose(pipe); 
+//     return result.str();
+// }
 
 // test function
 void get_cpu_info() {

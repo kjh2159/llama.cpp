@@ -205,15 +205,8 @@ int main(int argc, char ** argv) {
     std::string json_path = params.json_path;
     int length = params.csv_limit;
 
-// for dvfs
+// for ignite (resource)
     std::string device_name = params.device_name;
-    int cpu_freq_idx = params.cpu_freq_idx;
-    int ram_freq_idx = params.ram_freq_idx;
-
-// for ignite
-    int dp_itvl = params.dp_itvl;
-    int lp = params.lp;
-    int tp = params.tp;
 // --------------------------------------------------
 
 // The IGNNITE_USE_SYSTEM_DVFS option is valid only on mobile devices
@@ -235,11 +228,15 @@ int main(int argc, char ** argv) {
     // set file path
     if (output_txt_path != "") { dvfs.output_filename = output_txt_path; } 
     else { dvfs.output_filename = std::string(HARD_RECORD_FILE); }
+    if (dvfs.init_fd_cache() != 0) {
+        fprintf(stderr, "FD cache initialization failed. Are you root or authorized?\n");
+        return -1;
+    }
     
     // set cpu & ram freqs
-    const std::vector<int> cpu_freq_indices = dvfs.get_cpu_freqs_conf(cpu_freq_idx);
+    const std::vector<int> cpu_freq_indices = dvfs.get_cpu_freqs_conf(params.cpu_clk_idx_p);
     dvfs.set_cpu_freq(cpu_freq_indices);
-    dvfs.set_ram_freq(ram_freq_idx);
+    dvfs.set_ram_freq(params.ram_clk_idx_p);
 // --------------------------------------------------
 
 
@@ -250,7 +247,7 @@ int main(int argc, char ** argv) {
     //std::packaged_task<void()> task([&dvfs] { record_hard(std::ref(sigterm), dvfs); });
     //std::future<void> result = task.get_future();
     //std::thread(std::move(task)).detach();
-    std::thread record_thread = std::thread(record_hard, std::ref(sigterm), dvfs);
+    std::thread record_thread = std::thread(record_hard, std::ref(sigterm), std::ref(dvfs));
     auto start_sys_time = std::chrono::system_clock::now();
 // ----------------------------------------------------------------
 #else
