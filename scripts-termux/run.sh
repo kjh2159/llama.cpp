@@ -1,13 +1,13 @@
 #! bin/bash
 # this script should be run on llama.cpp/ dir.
 
-# silver core control
-su -c "echo 0 > /sys/devices/system/cpu/cpu1/online"
-su -c "echo 0 > /sys/devices/system/cpu/cpu2/online"
-su -c "echo 0 > /sys/devices/system/cpu/cpu3/online"
-
 # screen brightness control
 su -c "echo 0 > /sys/class/backlight/panel0-backlight/brightness"
+
+# silver core control
+su -c "echo 1 > /sys/devices/system/cpu/cpu1/online"
+su -c "echo 1 > /sys/devices/system/cpu/cpu2/online"
+su -c "echo 1 > /sys/devices/system/cpu/cpu3/online"
 
 
 ./build/bin-arm/ignite \
@@ -19,10 +19,12 @@ su -c "echo 0 > /sys/class/backlight/panel0-backlight/brightness"
     --top-k 5 \
     --threads 1 \
     --device-name Pixel9 \
-    --output-path outputs/hotpot_0_0.csv \
+    --output-path outputs/hotpot_12_11.csv \
     --json-path dataset/hotpot_qa_30.json \
-    --cpu-freq 0 \
-    --ram-freq 0
+    --cpu-p 12 \
+    --ram-d 11 \
+    --cpu-p 12 \
+    --ram-d 11
 
 
 su -c "echo 1 > /sys/devices/system/cpu/cpu1/online"
