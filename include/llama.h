@@ -405,12 +405,12 @@ extern "C" {
 
         // basic measure configs
         int csv_limit;       // limit of CSV questions (0=no limit) // deprecated in future
-        const char * json_path; // deprecated in future
-        const char * output_csv_path; // deprecated in future
-        const char * input_path; // path = dir/file.ext
-        const char * output_dir;
-        const char * output_path_hard;
-        const char * output_path_infer;
+        char json_path[128]; // deprecated in future
+        char output_csv_path[128]; // deprecated in future
+        char input_path[128]; // path = dir/file.ext
+        char output_dir[128];
+        char output_path_hard[128];
+        char output_path_infer[128];
 
         // [OPT. 1] resource plane (static ignite)
         const char * device_name;
@@ -1451,6 +1451,8 @@ extern "C" {
     LLAMA_API void llama_ignite_set_layer_pause(struct llama_context * ctx,  uint16_t ms);
     LLAMA_API uint16_t llama_ignite_get_layer_pause(struct llama_context * ctx);
     LLAMA_API bool init_ignite_params(struct llama_context * ctx, llama_igparams* igparams);
+    LLAMA_API bool init_ignite_filename(struct llama_context * ctx);
+    LLAMA_API llama_igparams * get_ignite_params(struct llama_context * ctx);
 
 #ifdef __cplusplus
 }

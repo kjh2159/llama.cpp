@@ -196,64 +196,6 @@ int main(int argc, char ** argv) {
             - lp;               // layer pause (ms)
             - tp;               // token pause (ms)
     */
-
-// --------------------------------------------------
-//  for stream
-    // TODO: change
-    std::string output_path = replace(params.output_csv_path, ".csv", "_infer.csv");
-    std::string output_txt_path = replace(output_path, "_infer.csv", "_hard.txt");
-    std::string json_path = params.json_path;
-    int length = params.csv_limit;
-
-// for ignite (resource)
-    std::string device_name = params.device_name;
-// --------------------------------------------------
-
-// The IGNNITE_USE_SYSTEM_DVFS option is valid only on mobile devices
-#if IGNITE_USE_SYSTEM_DVFS
-    params.is_ignite_active = true;
-// --------------------------------------------------
-//  Record '_infer_' initialization
-    std::ofstream file(output_path, std::ios::app);
-    if (file.is_open() && output_path!="") {
-        file << "sys_time, prefill_speed, decode_speed, prefill_token, decode_token, ttft\n";
-        file.close();
-    }
-// --------------------------------------------------
-
-
-// --------------------------------------------------
-// DVFS initialization
-    DVFS dvfs(device_name);
-    // set file path
-    if (output_txt_path != "") { dvfs.output_filename = output_txt_path; } 
-    else { dvfs.output_filename = std::string(HARD_RECORD_FILE); }
-    if (dvfs.init_fd_cache() != 0) {
-        fprintf(stderr, "FD cache initialization failed. Are you root or authorized?\n");
-        return -1;
-    }
-    
-    // set cpu & ram freqs
-    const std::vector<int> cpu_freq_indices = dvfs.get_cpu_freqs_conf(params.cpu_clk_idx_p);
-    dvfs.set_cpu_freq(cpu_freq_indices);
-    dvfs.set_ram_freq(params.ram_clk_idx_p);
-// --------------------------------------------------
-
-
-// ----------------------------------------------------------------
-// bg hard recording thread
-    // clang 19.1.7 not supported
-    //std::future<void> result = std::async(std::launch::async, record_hard, sigterm, dvfs);
-    //std::packaged_task<void()> task([&dvfs] { record_hard(std::ref(sigterm), dvfs); });
-    //std::future<void> result = task.get_future();
-    //std::thread(std::move(task)).detach();
-    std::thread record_thread = std::thread(record_hard, std::ref(sigterm), std::ref(dvfs));
-    auto start_sys_time = std::chrono::system_clock::now();
-// ----------------------------------------------------------------
-#else
-    std::cout << "IGNITE is OFF now.\r\n"; 
-    auto start_sys_time = std::chrono::system_clock::now();
-#endif
     
     common_init();
 
@@ -390,6 +332,78 @@ int main(int argc, char ** argv) {
             LOG_INF("%s: in-suffix/prefix is specified, chat template will be disabled\n", __func__);
         }
     }
+
+// --------------------------------------------------
+//  for stream
+    // TODO: change
+    // deprecated
+    std::string output_path = replace(params.output_csv_path, ".csv", "_infer.csv");
+    std::string output_txt_path = replace(output_path, "_infer.csv", "_hard.txt");
+    std::string json_path = params.json_path;
+    int length = params.csv_limit;
+
+// for ignite (resource)
+    std::string device_name = params.device_name;
+// --------------------------------------------------
+
+// The IGNNITE_USE_SYSTEM_DVFS option is valid only on mobile devices
+#if IGNITE_USE_SYSTEM_DVFS
+    params.is_ignite_active = true;
+// --------------------------------------------------
+//  Record '_infer_' initialization
+    std::ofstream file(output_path, std::ios::app);
+    if (file.is_open() && output_path!="") {
+        file << "sys_time, prefill_speed, decode_speed, prefill_token, decode_token, ttft\n";
+        file.close();
+    }
+// --------------------------------------------------
+
+
+// --------------------------------------------------
+// DVFS initialization
+    DVFS dvfs(device_name);
+    // set file path
+    if (init_ignite_filename(ctx)) {
+        LOG_INF("%s: ignite filename initialized successfully.\n", __func__);
+    } else {
+        // failed to initialize filename
+        // set the filename manually
+        // dvfs.output_filename = std::string(HARD_RECORD_FILE);
+        LOG_ERR("%s: ignite filename initialization failed.\n", __func__);
+        return -1;
+    }
+    if (dvfs.init_fd_cache() != 0) {
+        fprintf(stderr, "FD cache initialization failed. Are you root or authorized?\n");
+        return -1;
+    }
+    
+    // set cpu & ram freqs
+    const std::vector<int> cpu_freq_indices = dvfs.get_cpu_freqs_conf(params.cpu_clk_idx_p);
+    dvfs.set_cpu_freq(cpu_freq_indices);
+    dvfs.set_ram_freq(params.ram_clk_idx_p);
+// --------------------------------------------------
+
+
+// ----------------------------------------------------------------
+// bg hard recording thread
+    // clang 19.1.7 not supported
+    //std::future<void> result = std::async(std::launch::async, record_hard, sigterm, dvfs);
+    //std::packaged_task<void()> task([&dvfs] { record_hard(std::ref(sigterm), dvfs); });
+    //std::future<void> result = task.get_future();
+    //std::thread(std::move(task)).detach();
+    std::thread record_thread = std::thread(record_hard, std::ref(sigterm), std::ref(dvfs));
+    auto start_sys_time = std::chrono::system_clock::now();
+// ----------------------------------------------------------------
+#else
+    DVFS dvfs(device_name);
+    init_ignite_filename(ctx);
+    std::cout << "IGNITE is OFF now.\r\n";
+    auto start_sys_time = std::chrono::system_clock::now();
+#endif
+
+    auto ig = get_ignite_params(ctx); // ignite parameters
+    //printf("%s: hard output path: %s\n", __func__, ig->output_path_hard); // debug
+    // [26.01.21] now, inference result path is set by ig->output_path_infer. (see #L1074)
 
     // print system information
     {
@@ -1057,7 +1071,7 @@ int main(int argc, char ** argv) {
                     // LOG_INF("Inference time for previous question: %lld ms\n", inference_duration);
                     common_perf_print(ctx, smpl);
                     if(output_path!=""){
-                        llama_perf_context_print_custom(ctx, output_path, start_sys_time);
+                        llama_perf_context_print_custom(ctx, ig->output_path_infer, start_sys_time);
                     }
                     //check_hardware(device_name);
                     // common_sampler_free(smpl);

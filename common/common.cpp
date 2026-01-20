@@ -391,10 +391,10 @@ void common_ignite_init(llama_context * ctx, common_params & params) {
     ig.decode_speed   = params.decode_speed;
 
     // TODO: deprecated in future (extract into API level)
-    ig.input_path        = params.input_path.c_str();
-    ig.output_dir        = params.output_dir.c_str();
-    ig.output_path_hard  = params.output_path_hard.c_str();
-    ig.output_path_infer = params.output_path_infer.c_str();
+    std::strcpy(ig.input_path,        params.input_path.c_str());
+    std::strcpy(ig.output_dir,        params.output_dir.c_str());
+    std::strcpy(ig.output_path_hard,  params.output_path_hard.c_str());
+    std::strcpy(ig.output_path_infer, params.output_path_infer.c_str());
 
     ig.cpu_clk_idx_p = params.cpu_clk_idx_p;
     ig.ram_clk_idx_p = params.ram_clk_idx_p;

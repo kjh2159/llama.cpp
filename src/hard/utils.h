@@ -18,8 +18,4 @@ std::string execute_cmd(const char* cmd);
 // throttling detection support
 std::string apply_sudo_and_get(std::string command);
 
-struct llama_context; // opaque
-struct common_params;
-bool init_ignite_filename(struct llama_context * ctx);
-
 #endif // UTILS_H

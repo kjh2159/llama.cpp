@@ -36,6 +36,7 @@ add_library(llama
             unicode-data.cpp
             unicode.cpp
             unicode.h
+            hard/utils.cpp
             )
 
 add_library(dvfs

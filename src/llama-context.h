@@ -91,6 +91,8 @@ struct llama_context {
     void set_ignite_params(
             const llama_igparams * cfg);
 
+    struct llama_igparams * get_ignite_params();
+
     bool rm_adapter_lora(
             llama_adapter_lora * adapter);
 
@@ -320,8 +322,10 @@ private:
 
     mutable int32_t n_reused = 0; // number of times the previous graph was reused
 
-
+    //
     // ignite: layer-pause
+    //
+private:
     enum class lp_mha_key_t { none, attn_out, kqv_out };
     bool lp_enable = true;
     bool lp_is_prefill = false;
@@ -332,4 +336,7 @@ private:
     friend bool llama_ignite_get_active(struct llama_context * ctx);
     friend void llama_ignite_set_layer_pause(struct llama_context * ctx,  uint16_t ms);
     friend uint16_t llama_ignite_get_layer_pause(struct llama_context * ctx);
+
+public:
+    struct llama_igparams get_ignite_ctx();
 };

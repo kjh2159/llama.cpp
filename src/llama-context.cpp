@@ -3000,3 +3000,13 @@ void llama_opt_epoch(
         callback_train,
         callback_eval);
 }
+
+
+//
+// ignite
+//
+
+struct llama_igparams * llama_context::get_ignite_params(){
+    // LLAMA_LOG_DEBUG("%s: call\n", __func__);
+    return &igparams;
+}

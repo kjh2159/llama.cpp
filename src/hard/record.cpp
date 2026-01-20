@@ -1,40 +1,6 @@
 #include "record.h"
 #include <algorithm>
 
-// static std::vector<std::string> split_string(const std::string& str){
-//     // initialization
-//     std::vector<std::string> result;
-//     // conversion to stream string
-//     std::istringstream iss(str);
-//     std::string value; // splited value
-
-//     while (iss >> value){
-//         result.push_back(value); // accumulation
-//     }
-
-//     return result;
-// }
-
-
-// static std::string execute_cmd(const char* cmd){
-//     // command execution
-//     FILE* pipe = popen(cmd, "r");
-    
-//     // check pipe open
-//     if (!pipe) { std::cerr << "failed to pipe open (record.h)\n"; return "";}
-
-//     // get output from buffer
-//     std::ostringstream result;
-//     char buff[8192];
-//     while (fgets(buff, sizeof(buff), pipe) != nullptr){
-//         result << buff;
-//     }
-
-//     // close pipe
-//     pclose(pipe); 
-//     return result.str();
-// }
-
 // test function
 void get_cpu_info() {
     std::string command = "su -c \""; //prefix
@@ -49,8 +15,6 @@ void get_cpu_info() {
     //std::string output = execute_cmd(command.c_str());
     //std::cout << execute_cmd(command.c_str())[0] << std::endl;
 }
-
-
 
 const std::string get_records_names(const DVFS& dvfs) {
     std::string names = "Time,";
@@ -101,7 +65,6 @@ const std::string get_records_names(const DVFS& dvfs) {
 
 	return names;
 }
-
 
 /* 
  * GET HARD RECORDS function
@@ -171,7 +134,6 @@ std::vector<std::string> get_hard_records(const DVFS& dvfs) {
     return split_string(output);
 }
 
-
 std::vector<std::string> get_hard_records_wo_systime(const DVFS& dvfs){
     std::vector<int> cluster_indices = dvfs.get_cluster_indices();
     std::string device_name = dvfs.get_device_name();
@@ -231,7 +193,6 @@ std::vector<std::string> get_hard_records_wo_systime(const DVFS& dvfs){
     return split_string(output);
 }
 
-
 void write_file(const std::vector<std::string>& data, std::string output){
     
     // open file append mode
@@ -271,11 +232,9 @@ void write_file(const std::string& data, std::string output){
 }
 
 
-
 /*
- * TO DO
- * ### This function should be called by background process! ###
  * 
+ * ### This function should be called by background process! 
  * ### sigterm should be true after experiment completion
  * 
  * */
