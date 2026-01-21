@@ -407,8 +407,6 @@ int main(int argc, char ** argv) {
     std::cout << "IGNITE is OFF now.\r\n";
     auto start_sys_time = std::chrono::system_clock::now();
 #endif
-
-    std::cout << dvfs.output_filename << "\n\r";
     ignite_params_system_info(ig);
 
     // print system information

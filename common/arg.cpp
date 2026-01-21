@@ -1816,8 +1816,8 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
     ).set_examples({LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_MAIN}));
 
     add_opt(common_arg(
-        {"--output-path"}, "OP",
-        "result output path for resource and inference information",
+        {"--output-dir"}, "OD",
+        "result output directory for resource and inference information",
         [](common_params & params, const std::string & value) {
             params.output_dir = value;
         }
