@@ -56,7 +56,7 @@ cd scripts && sh build-android.sh && cd ..
 
 ```sh
 chmod +x scripts-termux/run.sh
-su -c "taskset f0 sh scripts-termux/run.sh"
+su -c "sh scripts-termux/run.sh"
 ```
 
 ### Build (Linux)

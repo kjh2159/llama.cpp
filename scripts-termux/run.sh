@@ -10,7 +10,7 @@ su -c "echo 1 > /sys/devices/system/cpu/cpu2/online"
 su -c "echo 1 > /sys/devices/system/cpu/cpu3/online"
 
 
-./build/bin-arm/ignite \
+./build/bin/ignite \
     -m ~/.cache/llama.cpp/tensorblock_Qwen1.5-0.5B-GGUF_Qwen1.5-0.5B-Q4_K.gguf \ 
     -cnv \
     --temp 0 \
