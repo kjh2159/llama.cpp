@@ -376,6 +376,11 @@ int main(int argc, char ** argv) {
         fprintf(stderr, "FD cache initialization failed. Are you root or authorized?\n");
         return -1;
     }
+
+    auto ig = get_ignite_params(ctx); // ignite parameters
+    dvfs.output_filename = std::string(ig->output_path_hard);
+    //printf("%s: hard output path: %s\n", __func__, ig->output_path_hard); // debug
+    // [26.01.21] now, inference result path is set by ig->output_path_infer. (see #L1074)
     
     // set cpu & ram freqs
     const std::vector<int> cpu_freq_indices = dvfs.get_cpu_freqs_conf(params.cpu_clk_idx_p);
@@ -397,13 +402,13 @@ int main(int argc, char ** argv) {
 #else
     DVFS dvfs(device_name);
     init_ignite_filename(ctx);
+    auto ig = get_ignite_params(ctx); // ignite parameters
+    dvfs.output_filename = std::string(ig->output_path_hard);
     std::cout << "IGNITE is OFF now.\r\n";
     auto start_sys_time = std::chrono::system_clock::now();
 #endif
 
-    auto ig = get_ignite_params(ctx); // ignite parameters
-    //printf("%s: hard output path: %s\n", __func__, ig->output_path_hard); // debug
-    // [26.01.21] now, inference result path is set by ig->output_path_infer. (see #L1074)
+    std::cout << dvfs.output_filename << "\n\r";
 
     // print system information
     {
