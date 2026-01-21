@@ -1505,7 +1505,8 @@ ggml_status llama_context::graph_compute(
     }
 //--------------------------------------------------
     // register lp_eval_callback function to eval scheduler (inject into only prefill phase)
-    if (igparams.is_ignite_active) ggml_backend_sched_set_eval_callback(sched.get(), lp_eval_callback, this);
+    // [26.01.22] ignite_verbose should be eliminated in the future.
+    if (igparams.is_ignite_active && igparams.ignite_verbose) ggml_backend_sched_set_eval_callback(sched.get(), lp_eval_callback, this);
 //--------------------------------------------------
     auto status = ggml_backend_sched_graph_compute_async(sched.get(), gf);
     if (status != GGML_STATUS_SUCCESS) {

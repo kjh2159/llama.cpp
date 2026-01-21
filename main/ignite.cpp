@@ -198,7 +198,7 @@ int main(int argc, char ** argv) {
     */
     
     common_init();
-
+    params.is_ignite_active = true;
     auto & sparams = params.sampling;
 
     // save choice to use color for later
@@ -372,7 +372,7 @@ int main(int argc, char ** argv) {
     // [26.01.21] now, inference result path is set by ig->output_path_infer. (see #L1074)
     
     // set cpu & ram freqs
-    const std::vector<int> cpu_freq_indices = dvfs.get_cpu_freqs_conf(params.cpu_clk_idx_p);
+    std::vector<int> cpu_freq_indices = dvfs.get_cpu_freqs_conf(params.cpu_clk_idx_p);
     dvfs.set_cpu_freq(cpu_freq_indices);
     dvfs.set_ram_freq(params.ram_clk_idx_p);
 // --------------------------------------------------
@@ -380,7 +380,6 @@ int main(int argc, char ** argv) {
 
     
 // --------------------------------------------------
-    params.is_ignite_active = true;
 //  Record '_infer_' initialization
     std::ofstream file(ig->output_path_infer, std::ios::app);
     if (file.is_open() && ig->output_path_infer!="") {
@@ -416,7 +415,7 @@ int main(int argc, char ** argv) {
         LOG_INF("%s\n", common_params_get_system_info(params).c_str());
         LOG_INF("\n");
     }
-
+ 
     std::string path_session = params.path_prompt_cache;
     std::vector<llama_token> session_tokens;
 
@@ -881,11 +880,23 @@ int main(int argc, char ** argv) {
 // ------------------------------------------------
                 // prefill/decode detector
                 if (!generation_started) {
+                    if (!prefill_active && ig->is_ignite_active) {
+                        std::vector<int> cpu_freq_indices = dvfs.get_cpu_freqs_conf(ig->cpu_clk_idx_p);
+                        // dvfs.set_cpu_freq(cpu_freq_indices);
+                        // dvfs.set_ram_freq(ig->ram_clk_idx_p);
+                        std::cout << std::flush << "<prefill_setup>"; // test
+                    }
                     if (!prefill_active) {  
                         prefill_active = true; decode_active = false;
                         std::cout << std::flush << "<prefill>";
                     }
                 } else {
+                    if (!decode_active && ig->is_ignite_active) {
+                        std::vector<int> cpu_freq_indices = dvfs.get_cpu_freqs_conf(ig->cpu_clk_idx_d);
+                        // dvfs.set_cpu_freq(cpu_freq_indices);
+                        // dvfs.set_ram_freq(ig->ram_clk_idx_d);
+                        std::cout << std::flush << "<decode_setup>"; // test
+                    }
                     if (!decode_active) {  
                         prefill_active = false; decode_active = true;
                         std::cout << std::flush << "<decode>";
@@ -1118,7 +1129,7 @@ int main(int argc, char ** argv) {
                     // 2. json-query mode
                     // Use next question from JSON file
                     // TODO: apply seamless think mode only Qwen3.
-                    buffer = "/no_think ";
+                    buffer = "/no_think "; // see `general.architecture`
                     buffer += json_questions[current_question_index++];
                     ctx_kv_cache_clear(ctx);
                     llama_perf_context_reset(ctx);

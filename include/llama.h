@@ -388,6 +388,7 @@ extern "C" {
     typedef struct llama_igparams {
     // graph internal parameters
         bool is_ignite_active;               // ignite active status
+        bool ignite_verbose;                // enable verbose logging for ignite
         uint16_t layer_pause;      // per-layer pause in milliseconds
 
     // graph external parameters

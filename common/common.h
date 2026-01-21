@@ -517,6 +517,7 @@ struct common_params {
     double prefill_speed = 0.0; // tokens/s
     double decode_speed = 0.0; // tokens/s
     bool is_ignite_active = false;
+    bool ignite_verbose = false;
 
     // basic measure configs
     int csv_limit = 0;       // limit of CSV questions (0=no limit) // deprecated in future

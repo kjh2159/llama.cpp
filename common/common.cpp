@@ -379,6 +379,7 @@ void common_ignite_init(llama_context * ctx, common_params & params) {
     llama_igparams ig{}; //tmp
   // graph internal parameters
     llama_ignite_set_active(ctx, params.is_ignite_active);
+    std::cout << std::flush << std::boolalpha << params.is_ignite_active << "\r\n";
     llama_ignite_set_layer_pause(ctx, params.layer_pause);
 
   // graph external parameters
@@ -398,11 +399,13 @@ void common_ignite_init(llama_context * ctx, common_params & params) {
 
     // resource plane (static ignite)
     std::strcpy(ig.device_name, params.device_name.c_str());
-    ig.cpu_clk_idx_p = params.cpu_clk_idx_p;
-    ig.ram_clk_idx_p = params.ram_clk_idx_p;
-    ig.cpu_clk_idx_d = params.cpu_clk_idx_d;
-    ig.ram_clk_idx_d = params.ram_clk_idx_d;
-    ig.fixed_config  = params.fixed_config;
+    ig.is_ignite_active = params.is_ignite_active;
+    ig.ignite_verbose   = params.ignite_verbose;
+    ig.cpu_clk_idx_p    = params.cpu_clk_idx_p;
+    ig.ram_clk_idx_p    = params.ram_clk_idx_p;
+    ig.cpu_clk_idx_d    = params.cpu_clk_idx_d;
+    ig.ram_clk_idx_d    = params.ram_clk_idx_d;
+    ig.fixed_config     = params.fixed_config;
 
     ig.time_slot       = params.time_slot;
     ig.temp_threshold  = params.temp_threshold;
