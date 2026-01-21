@@ -18,6 +18,7 @@ su -c "echo 1 > /sys/devices/system/cpu/cpu3/online"
     --top-k 5 \
     --threads 1 \
     --device-name Pixel9 \
+    --ignite-verbose off \
     --output-dir outputs/ \
     --json-path dataset/hotpot_qa_30.json \
     --cpu-p 12 \
