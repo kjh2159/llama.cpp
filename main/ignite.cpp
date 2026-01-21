@@ -348,17 +348,6 @@ int main(int argc, char ** argv) {
 
 // The IGNNITE_USE_SYSTEM_DVFS option is valid only on mobile devices
 #if IGNITE_USE_SYSTEM_DVFS
-    params.is_ignite_active = true;
-// --------------------------------------------------
-//  Record '_infer_' initialization
-    std::ofstream file(output_path, std::ios::app);
-    if (file.is_open() && output_path!="") {
-        file << "sys_time, prefill_speed, decode_speed, prefill_token, decode_token, ttft\n";
-        file.close();
-    }
-// --------------------------------------------------
-
-
 // --------------------------------------------------
 // DVFS initialization
     DVFS dvfs(device_name);
@@ -386,6 +375,18 @@ int main(int argc, char ** argv) {
     const std::vector<int> cpu_freq_indices = dvfs.get_cpu_freqs_conf(params.cpu_clk_idx_p);
     dvfs.set_cpu_freq(cpu_freq_indices);
     dvfs.set_ram_freq(params.ram_clk_idx_p);
+// --------------------------------------------------
+
+
+    
+// --------------------------------------------------
+    params.is_ignite_active = true;
+//  Record '_infer_' initialization
+    std::ofstream file(ig->output_path_infer, std::ios::app);
+    if (file.is_open() && ig->output_path_infer!="") {
+        file << "sys_time, prefill_speed, decode_speed, prefill_token, decode_token, ttft\n";
+        file.close();
+    }
 // --------------------------------------------------
 
 
