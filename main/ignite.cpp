@@ -337,8 +337,8 @@ int main(int argc, char ** argv) {
 //  for stream
     // TODO: change
     // deprecated
-    std::string output_path = replace(params.output_csv_path, ".csv", "_infer.csv");
-    std::string output_txt_path = replace(output_path, "_infer.csv", "_hard.txt");
+    // std::string output_path = replace(params.output_csv_path, ".csv", "_infer.csv");
+    // std::string output_txt_path = replace(output_path, "_infer.csv", "_hard.txt");
     std::string json_path = params.json_path;
     int length = params.csv_limit;
 
@@ -409,6 +409,7 @@ int main(int argc, char ** argv) {
 #endif
 
     std::cout << dvfs.output_filename << "\n\r";
+    ignite_params_system_info(ig);
 
     // print system information
     {
@@ -1075,7 +1076,7 @@ int main(int argc, char ** argv) {
                     auto inference_duration = std::chrono::duration_cast<std::chrono::milliseconds>(inference_end_time - inference_start_time).count();
                     // LOG_INF("Inference time for previous question: %lld ms\n", inference_duration);
                     common_perf_print(ctx, smpl);
-                    if(output_path!=""){
+                    if(ig->output_path_infer!=""){
                         llama_perf_context_print_custom(ctx, ig->output_path_infer, start_sys_time);
                     }
                     //check_hardware(device_name);

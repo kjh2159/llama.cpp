@@ -413,7 +413,7 @@ extern "C" {
         char output_path_infer[128];
 
         // [OPT. 1] resource plane (static ignite)
-        const char * device_name;
+        char device_name[32]; // device name
         int cpu_clk_idx_p; // prefill + cpu
         int ram_clk_idx_p; // prefill + ram
         int cpu_clk_idx_d; // decode + cpu
@@ -1453,6 +1453,7 @@ extern "C" {
     LLAMA_API bool init_ignite_params(struct llama_context * ctx, llama_igparams* igparams);
     LLAMA_API bool init_ignite_filename(struct llama_context * ctx);
     LLAMA_API llama_igparams * get_ignite_params(struct llama_context * ctx);
+    LLAMA_API void ignite_params_system_info(const llama_igparams* igparams);
 
 #ifdef __cplusplus
 }

@@ -1819,7 +1819,7 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
         {"--output-path"}, "OP",
         "result output path for resource and inference information",
         [](common_params & params, const std::string & value) {
-            params.output_csv_path = value;
+            params.output_dir = value;
         }
     ).set_examples({LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_MAIN}));
 

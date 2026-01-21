@@ -34,3 +34,4 @@ uint16_t llama_ignite_get_layer_pause(struct llama_context * ctx);
 // Please refer to `llama.h` for more details.
 bool init_ignite_params(struct llama_context * ctx, llama_igparams* igparams);
 struct llama_igparams * get_ignite_params(struct llama_context * ctx);
+void ignite_params_system_info(const llama_igparams* igparams);

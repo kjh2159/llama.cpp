@@ -134,11 +134,20 @@ bool init_ignite_filename(struct llama_context * ctx) {
     }
 
     _cp->fixed_config = fixed_config;
-    std::strcpy(_cp->output_path_hard, output_hard.c_str());
+    std::strcpy(_cp->output_path_hard, output_hard.c_str()); // string -> char[]
     std::strcpy(_cp->output_path_infer, output_infer.c_str());
-    
-    // _cp->output_path_hard = output_hard;
-    // _cp->output_path_infer = output_infer;
-    std::cout << "[IGNITE] Hard Filename: " << _cp->output_path_hard << "\n\r";
+    // std::cout << "[IGNITE] Hard Filename: " << _cp->output_path_hard << "\n\r";
     return true;
+}
+
+void ignite_params_system_info(const llama_igparams* igparams) {
+    printf("%s: device name\t\t\t= %s\n\r", __func__, igparams->device_name);
+    printf("%s: ignite active status\t\t= %s\n\r", __func__, igparams->is_ignite_active ? "ON" : "OFF");
+    printf("%s: strict generation\t\t= %s\n\r", __func__, igparams->strict_limit ? "ON" : "OFF");
+    printf("%s: enable thinking\t\t= %s\n\r", __func__, igparams->enable_thinking ? "ON" : "OFF");
+    printf("%s: prefill CPU/RAM clock idx\t= %d / %d\n\r", __func__, igparams->cpu_clk_idx_p, igparams->ram_clk_idx_p);
+    printf("%s: decode CPU/RAM clock idx\t= %d / %d\n\r", __func__, igparams->cpu_clk_idx_d, igparams->ram_clk_idx_d);
+    printf("%s: input dataset path\t\t= %s\n\r", __func__, igparams->input_path);
+    printf("%s: resource output file\t\t= %s\n\r", __func__, igparams->output_path_hard);
+    printf("%s: llm output file\t\t= %s\n\r", __func__, igparams->output_path_infer);
 }
