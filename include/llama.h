@@ -394,6 +394,7 @@ extern "C" {
     // graph external parameters
         // basic additional parameters
         bool strict_limit;
+        int strict_limit_length;
         bool enable_thinking;
 
         // llm plane

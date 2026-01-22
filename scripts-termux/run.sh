@@ -19,12 +19,15 @@ su -c "echo 1 > /sys/devices/system/cpu/cpu3/online"
     --threads 1 \
     --device-name Pixel9 \
     --ignite-verbose off \
+    --strict on \
+    --strict-length 64 \
     --output-dir outputs/ \
     --json-path dataset/hotpot_qa_30.json \
     --cpu-p 12 \
     --ram-d 11 \
     --cpu-p 12 \
-    --ram-d 11
+    --ram-d 11 \
+    -ctx 1024
 
 
 su -c "echo 1 > /sys/devices/system/cpu/cpu1/online"

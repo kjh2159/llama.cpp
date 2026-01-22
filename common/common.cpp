@@ -383,13 +383,15 @@ void common_ignite_init(llama_context * ctx, common_params & params) {
     llama_ignite_set_layer_pause(ctx, params.layer_pause);
 
   // graph external parameters
-    ig.layer_pause = params.layer_pause;
-    ig.phase_pause    = params.phase_pause;
-    ig.token_pause    = params.token_pause;
-    ig.query_interval = params.query_interval;
-    ig.prefill_phase  = params.prefill_phase;
-    ig.prefill_speed  = params.prefill_speed;
-    ig.decode_speed   = params.decode_speed;
+    ig.strict_limit        = params.strict_limit;
+    ig.strict_limit_length = params.strict_limit_length;
+    ig.layer_pause         = params.layer_pause;
+    ig.phase_pause         = params.phase_pause;
+    ig.token_pause         = params.token_pause;
+    ig.query_interval      = params.query_interval;
+    ig.prefill_phase       = params.prefill_phase;
+    ig.prefill_speed       = params.prefill_speed;
+    ig.decode_speed        = params.decode_speed;
 
     // TODO: deprecated in future (extract into API level)
     std::strcpy(ig.input_path,        params.json_path.c_str());

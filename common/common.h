@@ -506,6 +506,7 @@ struct common_params {
 
     // basic additional parameters
     bool strict_limit = false;
+    int strict_limit_length = 0;
     bool enable_thinking = false;
 
     // llm plane

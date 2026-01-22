@@ -1072,6 +1072,12 @@ int main(int argc, char ** argv) {
                 }
             }
 
+            // in strict mode, n_decode controls the number of tokens generated per user input
+            if (ig->strict_limit_length < n_past - embd_inp.size() && generation_started && ig->strict_limit) {
+                LOG_DBG("reached generation limit of %d tokens\n", ig->strict_limit_length);
+                is_interacting = true;
+            }
+
             if (params.conversation_mode && !waiting_for_first_input) {
                 if (!prompt.empty()) {
                     prompt.clear();
@@ -1079,6 +1085,7 @@ int main(int argc, char ** argv) {
                 }
             }
 
+            // inference beginning block
             if ((n_past > 0 || waiting_for_first_input) && is_interacting) {
 // -------------------------------
                 // Print inference time for previous question

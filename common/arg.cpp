@@ -1824,6 +1824,22 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
     ).set_examples({LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_MAIN}));
 
     add_opt(common_arg(
+        {"--strict"}, "ST",
+        "enable strict mode",
+        [](common_params & params, const std::string & value) {
+            params.strict_limit = is_truthy(value);
+        }
+    ).set_examples({LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_MAIN}));
+
+    add_opt(common_arg(
+        {"--strict-length"}, "SL",
+        "set strict length",
+        [](common_params & params, int value) {
+            params.strict_limit_length = value;
+        }
+    ).set_examples({LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_MAIN}));
+
+    add_opt(common_arg(
         {"--output-dir"}, "OD",
         "result output directory for resource and inference information",
         [](common_params & params, const std::string & value) {
