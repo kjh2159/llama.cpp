@@ -7,4 +7,4 @@ cmake -S .. \
       -DLLAMA_BUILD_IGNITE=ON \
       -DLLAMA_IGNITE_INSTALL=ON \
       -DIGNITE_USE_SYSTEM_DVFS=OFF
-cmake --build . --config Release -j
+cmake --build . --config Debug -j

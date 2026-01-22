@@ -928,6 +928,7 @@ int main(int argc, char ** argv) {
         embd.clear();
 
         if ((int) embd_inp.size() <= n_consumed && !is_interacting) {
+            std::cout << std::flush << "embd_inp: " << embd_inp.size() << " / " << "n_past: " << n_past << " / " << "n_remain: " << n_remain <<  " / " << "n_consumed: " << n_consumed << " / " << "n_session_consumed: " << n_session_consumed << "\n\r"; // debug
 // ------------------------------------------------
             // now, generation starts
             generation_started = true;
@@ -1131,10 +1132,18 @@ int main(int argc, char ** argv) {
                     // TODO: apply seamless think mode only Qwen3.
                     buffer = "/no_think "; // see `general.architecture`
                     buffer += json_questions[current_question_index++];
+                    
+                    // context reset for new question
                     ctx_kv_cache_clear(ctx);
+                    embd_inp.clear();
                     llama_perf_context_reset(ctx);
+                    n_past = 0; n_consumed = 0; waiting_for_first_input = true;
+                    common_sampler_reset(smpl);
+                    
+                    // logger info
                     LOG_INF("Using question from file: %s\n", buffer.c_str());
                     LOG("%s\n", buffer.c_str());
+                    
                     // Record the begining time of inference for a new question
                     inference_start_time = std::chrono::steady_clock::now();
                     inference_started = true;
