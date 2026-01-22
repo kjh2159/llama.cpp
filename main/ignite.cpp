@@ -928,7 +928,8 @@ int main(int argc, char ** argv) {
         embd.clear();
 
         if ((int) embd_inp.size() <= n_consumed && !is_interacting) {
-            std::cout << std::flush << "embd_inp: " << embd_inp.size() << " / " << "n_past: " << n_past << " / " << "n_remain: " << n_remain <<  " / " << "n_consumed: " << n_consumed << " / " << "n_session_consumed: " << n_session_consumed << "\n\r"; // debug
+            // test
+            // std::cout << std::flush << "embd_inp: " << embd_inp.size() << " / " << "n_past: " << n_past << " / " << "n_remain: " << n_remain <<  " / " << "n_consumed: " << n_consumed << " / " << "n_session_consumed: " << n_session_consumed << "\n\r"; // debug
 // ------------------------------------------------
             // now, generation starts
             generation_started = true;
