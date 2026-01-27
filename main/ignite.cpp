@@ -1134,6 +1134,7 @@ int main(int argc, char ** argv) {
                 // seamless user-input/json-query mode 
                 if (json_questions.size() == 0){
                     // 1. user-input mode
+                    // !! not supported !!
                     std::string line;
                     bool another_line = true;
                     do {
@@ -1146,7 +1147,8 @@ int main(int argc, char ** argv) {
                     // TODO: apply seamless think mode only Qwen3.
                     current_question_index += 1;
                     buffer = "/no_think "; // see `general.architecture`
-                    buffer += json_questions[current_question_index];
+                    auto tmp = json_questions[current_question_index];
+                    buffer += tmp;
                     
                     // context reset for new question
                     ctx_kv_cache_clear(ctx);
@@ -1158,7 +1160,7 @@ int main(int argc, char ** argv) {
                     // logger info
                     LOG_INF("[%zu/%zu] ", current_question_index, max_query_num);
                     // LOG_INF("Using question from file: %s\n", buffer.c_str());
-                    LOG("%s\n", buffer.c_str());
+                    LOG("%s\n", tmp.c_str());
                     
                     // Record the begining time of inference for a new question
                     inference_start_time = std::chrono::steady_clock::now();
