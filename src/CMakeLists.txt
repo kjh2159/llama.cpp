@@ -48,6 +48,8 @@ add_library(dvfs
             hard/record.h
             hard/utils.cpp
             hard/utils.h
+            hard/affinity.cpp
+            hard/affinity.h
             )
 
 target_include_directories(llama PRIVATE .)

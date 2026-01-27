@@ -4,6 +4,7 @@
 
 #include "dvfs.h"
 #include "utils.h"
+#include "affinity.h"
 
 #include <stdlib.h>
 

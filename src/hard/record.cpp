@@ -239,7 +239,7 @@ void write_file(const std::string& data, std::string output){
  * 
  * */
 void record_hard(std::atomic<bool>& sigterm, const DVFS& dvfs){
-
+    pin_current({2}); // generally silver core on mobile
     sigterm = false;
     std::string filename = dvfs.output_filename;
 
