@@ -1800,10 +1800,10 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
     ).set_examples({LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_MAIN}));
 
     add_opt(common_arg(
-        {"--csv-limit"}, "CL",
+        {"--max-query-number"}, "MQN",
         "maximum number of rows to store in CSV file (default: unlimited)",
         [](common_params & params, int value) {
-            params.csv_limit = value;
+            params.max_query_number = value;
         }
     ).set_examples({LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_MAIN}));
 
@@ -1832,8 +1832,8 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
     ).set_examples({LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_MAIN}));
 
     add_opt(common_arg(
-        {"--strict-length"}, "SL",
-        "set strict length",
+        {"--strict-limit"}, "SL",
+        "set strict length (for ouput length)",
         [](common_params & params, int value) {
             params.strict_limit_length = value;
         }

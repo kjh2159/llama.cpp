@@ -340,7 +340,7 @@ int main(int argc, char ** argv) {
     // std::string output_path = replace(params.output_csv_path, ".csv", "_infer.csv");
     // std::string output_txt_path = replace(output_path, "_infer.csv", "_hard.txt");
     std::string json_path = params.json_path;
-    int length = params.csv_limit;
+    
 
 // for ignite (resource)
     std::string device_name = params.device_name;
@@ -601,6 +601,8 @@ int main(int argc, char ** argv) {
         //     return 1;
         // }
     }
+    bool custom_max_query = ig->max_query_number == -1 ? false : true;
+    unsigned int max_query_num = custom_max_query ? ig->max_query_number : json_questions.size();
     // JSON questions load done
 //------------------------------------------------
 
@@ -1138,12 +1140,13 @@ int main(int argc, char ** argv) {
                         another_line = console::readline(line, params.multiline_input);
                         buffer += line;
                     } while (another_line);
-                } else if (current_question_index < json_questions.size()) {
+                } else if (current_question_index < max_query_num) {
                     // 2. json-query mode
                     // Use next question from JSON file
                     // TODO: apply seamless think mode only Qwen3.
+                    current_question_index += 1;
                     buffer = "/no_think "; // see `general.architecture`
-                    buffer += json_questions[current_question_index++];
+                    buffer += json_questions[current_question_index];
                     
                     // context reset for new question
                     ctx_kv_cache_clear(ctx);
@@ -1153,12 +1156,16 @@ int main(int argc, char ** argv) {
                     common_sampler_reset(smpl);
                     
                     // logger info
-                    LOG_INF("Using question from file: %s\n", buffer.c_str());
+                    LOG_INF("[%zu/%zu] ", current_question_index, max_query_num);
+                    // LOG_INF("Using question from file: %s\n", buffer.c_str());
                     LOG("%s\n", buffer.c_str());
                     
                     // Record the begining time of inference for a new question
                     inference_start_time = std::chrono::steady_clock::now();
                     inference_started = true;
+                } else if (current_question_index >= ig->max_query_number) {
+                    LOG_INF("Reached maximum query number (%d) from %s. Exiting interactive mode.\n", ig->max_query_number, json_path.c_str());
+                    break;
                 } else {
                     LOG_INF("No more questions available in %s. Exiting interactive mode.\n", json_path.c_str());
                     break;

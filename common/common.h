@@ -521,7 +521,7 @@ struct common_params {
     bool ignite_verbose = false;
 
     // basic measure configs
-    int csv_limit = 0;       // limit of CSV questions (0=no limit) // deprecated in future
+    int max_query_number = -1;       // limit of CSV questions (0=no limit) // deprecated in future
     std::string csv_path = ""; // path to CSV questions (empty=none) // deprecated in future
     std::string json_path = "questions.json"; // deprecated in future
     std::string output_csv_path; // deprecated in future
