@@ -12,22 +12,23 @@ su -c "echo 1 > /sys/devices/system/cpu/cpu3/online"
 
 ./build/bin/ignite \
     -m ~/.cache/llama.cpp/tensorblock_Qwen1.5-0.5B-GGUF_Qwen1.5-0.5B-Q4_K.gguf \ 
-    -cnv \
-    --temp 0 \
     -i \
+    -cnv \
+    -c 1024 \
+    --temp 0 \
     --top-k 5 \
     --threads 1 \
     --device-name Pixel9 \
     --ignite-verbose off \
-    --strict on \
-    --strict-length 64 \
     --output-dir outputs/ \
     --json-path dataset/hotpot_qa_30.json \
+    --strict on \
+    --strict-length 64 \
+    --max-query-number 20 \
     --cpu-p 12 \
     --ram-d 11 \
     --cpu-p 12 \
-    --ram-d 11 \
-    -ctx 1024
+    --ram-d 11
 
 
 su -c "echo 1 > /sys/devices/system/cpu/cpu1/online"
