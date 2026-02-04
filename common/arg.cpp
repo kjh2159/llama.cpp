@@ -1025,7 +1025,43 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
         }
     };
 
-
+// ignite options
+        add_opt(common_arg(
+        {"--json-path"}, "FNAME",
+        "path to JSON file for logging outputs (default: none)",
+        [](common_params & params, const std::string & value) {
+            params.json_path = value;
+        }
+    ).set_examples({LLAMA_EXAMPLE_COMPLETION}));
+    add_opt(common_arg(
+        {"--max-query-number"}, "MQN",
+        "maximum number of rows to store in CSV output file (default: unlimited)",
+        [](common_params & params, int value) {
+            params.max_query_number = value;
+        }
+    ).set_examples({LLAMA_EXAMPLE_SERVER}));
+    add_opt(common_arg(
+        {"--strict"}, "ST",
+        "enable strict mode",
+        [](common_params & params, const std::string & value) {
+            params.strict_limit = is_truthy(value);
+        }
+    ).set_examples({LLAMA_EXAMPLE_COMPLETION}));
+    add_opt(common_arg(
+        {"--strict-limit"}, "SL",
+        "set strict limit length (for ouput length)",
+        [](common_params & params, int value) {
+            params.strict_limit_length = value;
+        }
+    ).set_examples({LLAMA_EXAMPLE_COMPLETION}));
+    add_opt(common_arg(
+        {"--output-dir"}, "OD",
+        "result output directory for resource and inference information",
+        [](common_params & params, const std::string & value) {
+            params.output_dir = value;
+        }
+    ).set_examples({LLAMA_EXAMPLE_COMPLETION}));
+// common options
     add_opt(common_arg(
         {"-h", "--help", "--usage"},
         "print usage and exit",

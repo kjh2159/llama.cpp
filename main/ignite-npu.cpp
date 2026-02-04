@@ -32,7 +32,8 @@
 #pragma warning(disable: 4244 4267) // possible loss of data
 #endif
 
-#include "json.hpp"
+#include "nlohmann/json.hpp"
+
 using json = nlohmann::json;
 
 static llama_context           ** g_ctx;
@@ -44,6 +45,80 @@ static std::ostringstream       * g_output_ss;
 static std::vector<llama_token> * g_output_tokens;
 static bool is_interacting  = false;
 static bool need_insert_eot = false;
+
+void ctx_kv_cache_clear(struct llama_context * ctx) {
+    //llama_kv_cache_clear(ctx); //deprecated
+    auto* mem = llama_get_memory(ctx);
+    llama_memory_clear(mem, true);
+}
+
+std::tuple<int, double, int, double> llama_perf_context_print_custom(const struct llama_context * ctx, const std::string & output_filename, std::chrono::time_point<std::chrono::system_clock> start_sys_time) {
+    const auto data = llama_perf_context(ctx);
+    const double t_end_ms = 1e-3 * ggml_time_us();
+
+    // ("%s:        load time = %10.2f ms\n", __func__, data.t_load_ms);
+    // ("%s: prompt eval time = %10.2f ms / %5d tokens (%8.2f ms per token, %8.2f tokens per second)\n",
+    //         __func__, data.t_p_eval_ms, data.n_p_eval, data.t_p_eval_ms / data.n_p_eval, 1e3 / data.t_p_eval_ms * data.n_p_eval);
+    // LLAMA_LOG_INFO("%s:        eval time = %10.2f ms / %5d runs   (%8.2f ms per token, %8.2f tokens per second)\n",
+    //         __func__, data.t_eval_ms, data.n_eval, data.t_eval_ms / data.n_eval, 1e3 / data.t_eval_ms * data.n_eval);
+    // LLAMA_LOG_INFO("%s:       total time = %10.2f ms / %5d tokens\n", __func__, (t_end_ms - data.t_start_ms), (data.n_p_eval + data.n_eval));
+
+    // Open the CSV file in append mode
+    
+    
+    // Convert time_point to time_t (seconds since epoch)
+    auto now_sys_time = std::chrono::system_clock::now();
+    auto sys_time = std::chrono::duration_cast<std::chrono::milliseconds>(now_sys_time-start_sys_time).count();
+    // system time, prefill speed, decode speed, prefill tokens, decode tokens, ttft
+    std::ofstream file(output_filename, std::ios::app);
+    if (file.is_open()) {
+        file << std::to_string(sys_time) << "," << ( 1e3 / data.t_p_eval_ms *data.n_p_eval ) << "," << (1e3 / data.t_eval_ms * data.n_eval ) << "," 
+              << data.n_p_eval << ","<< data.n_eval << "," << (data.t_p_eval_ms)<<"\n";
+        file.close();
+    } else {
+        // LLAMA_LOG_INFO("Failed to open file: %s\n", output_filename.c_str());
+    }
+
+    return std::make_tuple(data.n_p_eval, 1e3 / data.t_p_eval_ms * data.n_p_eval, data.n_eval, 1e3 / data.t_eval_ms * data.n_eval);
+}
+
+std::vector<std::string> loadQuestions(const std::string &filename) {
+// A parsing function for "questions.json" with very simple way
+// The following is JSON file type:
+// {
+//   "questions": [
+//     "the first content of question",
+//     "the second content of question",
+//     "the third content of question"
+//   ]
+// }
+    std::vector<std::string> questions;
+    std::ifstream file(filename);
+    
+    if (!file) {
+        std::cerr << "Failed to open " << filename << ". Exiting.\n";
+        return questions;
+    }
+
+    try {
+        json jsonData;
+        file >> jsonData; // JSON parsing
+
+        if (jsonData.contains("questions") && jsonData["questions"].is_array()) {
+            for (const auto& item : jsonData["questions"]) {
+                if (item.is_string()) {
+                    questions.push_back(item.get<std::string>());
+                }
+            }
+        } else {
+            std::cerr << "Invalid JSON format: 'data' key missing or not an array\n";
+        }
+    } catch (const std::exception &e) {
+        std::cerr << "JSON parsing error: " << e.what() << "\n";
+    }
+
+    return questions;
+}
 
 static void print_usage(int argc, char ** argv) {
     (void) argc;
@@ -431,6 +506,34 @@ int main(int argc, char ** argv) {
         LOG_INF("\n");
     }
 
+//------------------------------------------------
+    // streaming initialization
+    std::string json_path = params.json_path;
+    std::cout << std::flush << "json_path: " << json_path << std::endl;
+    std::string output_path_infer = params.output_dir + "/inference_stats.csv"; // deprecated in future. see L#982
+    std::cout << std::flush << "output_path_infer: " << output_path_infer << std::endl;
+    auto start_sys_time = std::chrono::system_clock::now();
+    std::ofstream file(output_path_infer, std::ios::app);
+    if (file.is_open() && output_path_infer!="/inference_stats.csv") {
+        file << "sys_time, prefill_speed, decode_speed, prefill_token, decode_token, ttft\n";
+        file.close();
+    }
+
+    // Input json file instead of cli input
+    std::vector<std::string> json_questions;
+    size_t current_question_index = 0;
+    if (params.interactive) {
+        json_questions = loadQuestions(json_path);
+        // if (json_questions.empty()) {
+        //     LOG_ERR("No questions loaded from %s. Exiting interactive mode.\n", json_path.c_str());
+        //     return 1;
+        // }
+    }
+    bool custom_max_query = params.max_query_number == -1 ? false : true;
+    unsigned int max_query_num = custom_max_query ? params.max_query_number : json_questions.size();
+    // JSON questions load done
+//------------------------------------------------
+
     // ctrl+C handling
     {
 #if defined (__unix__) || (defined (__APPLE__) && defined (__MACH__))
@@ -446,6 +549,16 @@ int main(int argc, char ** argv) {
         SetConsoleCtrlHandler(reinterpret_cast<PHANDLER_ROUTINE>(console_ctrl_handler), true);
 #endif
     }
+
+// ------------------------------------------------
+    // timer variables
+    std::chrono::steady_clock::time_point inference_start_time;
+    bool inference_started = false;
+    // prefill/decode detector variables
+    bool generation_started = false;
+    bool prefill_active = false;
+    bool decode_active = false;
+// ------------------------------------------------
 
     if (params.interactive) {
         LOG_INF("%s: interactive mode on.\n", __func__);
@@ -706,6 +819,11 @@ int main(int argc, char ** argv) {
         embd.clear();
 
         if ((int) embd_inp.size() <= n_consumed && !is_interacting) {
+// ------------------------------------------------
+            // now, generation starts
+            generation_started = true;
+// ------------------------------------------------
+
             // optionally save the session on first sample (for faster prompt loading next time)
             if (session_do_save) {
                 session_do_save = false;
@@ -843,6 +961,12 @@ int main(int argc, char ** argv) {
                 }
             }
 
+            // in strict mode, n_decode controls the number of tokens generated per user input
+            if (params.strict_limit_length < n_past - embd_inp.size() && generation_started && params.strict_limit) {
+                LOG_DBG("reached generation limit of %d tokens\n", params.strict_limit_length);
+                is_interacting = true;
+            }
+
             if (params.conversation_mode && !waiting_for_first_input) {
                 if (!prompt.empty()) {
                     prompt.clear();
@@ -851,6 +975,21 @@ int main(int argc, char ** argv) {
             }
 
             if ((n_past > 0 || waiting_for_first_input) && is_interacting) {
+// -------------------------------
+                // Print inference time for previous question
+                if (inference_started) {
+                    auto inference_end_time = std::chrono::steady_clock::now();
+                    auto inference_duration = std::chrono::duration_cast<std::chrono::milliseconds>(inference_end_time - inference_start_time).count();
+                    // LOG_INF("Inference time for previous question: %lld ms\n", inference_duration);
+                    common_perf_print(ctx, smpl);
+                    if(output_path_infer!="/inference_stats.csv"){ // deprecated in future
+                        llama_perf_context_print_custom(ctx, output_path_infer, start_sys_time);
+                    }
+                    //check_hardware(device_name);
+                    // common_sampler_free(smpl);
+                    inference_started = false;
+                }
+// -------------------------------
                 LOG_DBG("waiting for user input\n");
 
                 if (params.conversation_mode) {
@@ -872,12 +1011,54 @@ int main(int argc, char ** argv) {
                 console::set_display(DISPLAY_TYPE_USER_INPUT);
                 display = params.display_prompt;
 
-                std::string line;
-                bool another_line = true;
-                do {
-                    another_line = console::readline(line, params.multiline_input);
-                    buffer += line;
-                } while (another_line);
+// ------------------------------------------------
+                // seamless user-input/json-query mode 
+                if (json_questions.size() == 0){
+                    // 1. user-input mode
+                    // !! not supported !!
+                    std::string line;
+                    bool another_line = true;
+                    do {
+                        another_line = console::readline(line, params.multiline_input);
+                        buffer += line;
+                    } while (another_line);
+                } else if (current_question_index < max_query_num) {
+                    // 2. json-query mode
+                    // Use next question from JSON file
+                    // TODO: apply seamless think mode only Qwen3.
+                    current_question_index += 1;
+                    buffer = "/no_think "; // see `general.architecture`
+                    auto tmp = json_questions[current_question_index-1]; // only json requires -1
+                    buffer += tmp;
+                    
+                    // context reset for new question
+                    ctx_kv_cache_clear(ctx);
+                    embd_inp.clear();
+                    llama_perf_context_reset(ctx);
+                    n_past = 0; n_consumed = 0; waiting_for_first_input = true;
+                    common_sampler_reset(smpl);
+
+                    generation_started = false;
+                    n_remain = params.n_predict;
+                    ga_i = 0;
+                    is_antiprompt = false;
+                    
+                    // logger info
+                    LOG_INF("[%zu/%zu] ", current_question_index, max_query_num);
+                    // LOG_INF("Using question from file: %s\n", buffer.c_str());
+                    LOG("%s\n", tmp.c_str());
+                    
+                    // Record the begining time of inference for a new question
+                    inference_start_time = std::chrono::steady_clock::now();
+                    inference_started = true;
+                } else if (current_question_index >= params.max_query_number) {
+                    LOG_INF("Reached maximum query number (%d) from %s. Exiting interactive mode.\n", params.max_query_number, json_path.c_str());
+                    break;
+                } else {
+                    LOG_INF("No more questions available in %s. Exiting interactive mode.\n", json_path.c_str());
+                    break;
+                }
+// ------------------------------------------------
 
                 // done taking input, reset color
                 console::set_display(DISPLAY_TYPE_RESET);

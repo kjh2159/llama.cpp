@@ -614,6 +614,30 @@ struct common_params {
     // return false from callback to abort model loading or true to continue
     llama_progress_callback load_progress_callback = NULL;
     void *                  load_progress_callback_user_data = NULL;
+
+    // basic additional parameters
+    bool strict_limit = false;
+    int strict_limit_length = 0;
+    bool enable_thinking = false;
+
+    // llm plane
+    // int phase_pause = 0; // ms
+    // int token_pause = 0; // ms
+    // int layer_pause = 0; // ms
+    // int query_interval = 0; // ms
+    // bool prefill_phase = true; // prefill phase or not
+    // double prefill_speed = 0.0; // tokens/s
+    // double decode_speed = 0.0; // tokens/s
+    // bool is_ignite_active = false;
+    // bool ignite_verbose = false;
+
+    // basic measure configs
+    int max_query_number = -1;       // limit of CSV questions (0=no limit) // deprecated in future
+    std::string json_path = "questions.json"; // deprecated in future
+    std::string input_path = ""; // path = dir/file.ext
+    std::string output_dir = "";
+    std::string output_path_hard = "";
+    std::string output_path_infer = "";
 };
 
 // call once at the start of a program if it uses libcommon
