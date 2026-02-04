@@ -4,16 +4,12 @@
 #include "llama-cparams.h"
 #include "llama-graph.h"
 #include "llama-adapter.h"
-#include "llama-ignite.h"
 
 #include "ggml-cpp.h"
 #include "ggml-opt.h"
 
 #include <map>
 #include <vector>
-#include <iostream>
-#include <chrono>
-#include <thread>
 
 struct llama_model;
 class llama_batch_allocr;
@@ -30,6 +26,10 @@ struct llama_memory_breakdown_data {
     size_t model   = 0; // memory allocated for the model
     size_t context = 0; // memory allocated for the context
     size_t compute = 0; // memory allocated for temporary compute buffers
+
+    size_t total() const {
+        return model + context + compute;
+    }
 };
 
 struct llama_context {
@@ -40,6 +40,14 @@ struct llama_context {
 
     ~llama_context();
 
+    // reserve a new backend scheduler (if needed)
+    // for example, when:
+    //   - changing loras
+    //   - changing samplers
+    //   - changing attention type
+    //   - etc.
+    void sched_reserve();
+
     void synchronize();
 
     const llama_model   & get_model()   const;
@@ -47,11 +55,11 @@ struct llama_context {
 
     ggml_backend_sched_t get_sched() const;
 
-    uint32_t n_ctx()         const;
-    uint32_t n_ctx_per_seq() const;
-    uint32_t n_batch()       const;
-    uint32_t n_ubatch()      const;
-    uint32_t n_seq_max()     const;
+    uint32_t n_ctx()     const;
+    uint32_t n_ctx_seq() const;
+    uint32_t n_batch()   const;
+    uint32_t n_ubatch()  const;
+    uint32_t n_seq_max() const;
 
     uint32_t n_threads()       const;
     uint32_t n_threads_batch() const;
@@ -70,6 +78,18 @@ struct llama_context {
     float * get_embeddings_ith(int32_t i);
     float * get_embeddings_seq(llama_seq_id seq_id);
 
+    llama_token * get_sampled_tokens() const;
+    llama_token   get_sampled_token_ith(int32_t idx);
+
+    float * get_sampled_logits_ith(int32_t idx);
+    size_t  get_sampled_logits_count(int32_t idx);
+
+    float * get_sampled_probs_ith(int32_t idx);
+    size_t  get_sampled_probs_count(int32_t idx);
+
+    const llama_token * get_sampled_candidates_ith(int32_t idx);
+    size_t get_sampled_candidates_count(int32_t idx);
+
     void attach_threadpool(
             ggml_threadpool_t threadpool,
             ggml_threadpool_t threadpool_batch);
@@ -87,11 +107,6 @@ struct llama_context {
     void set_adapter_lora(
             llama_adapter_lora * adapter,
             float scale);
-
-    void set_ignite_params(
-            const llama_igparams * cfg);
-
-    struct llama_igparams * get_ignite_params();
 
     bool rm_adapter_lora(
             llama_adapter_lora * adapter);
@@ -201,23 +216,27 @@ private:
 
     void output_reorder();
 
+    // map the output row index `i` to batch index
+    int64_t output_resolve_row(int32_t i) const;
+
     //
     // graph
     //
 
 public:
-    uint32_t graph_max_nodes() const;
+    uint32_t graph_max_nodes(uint32_t n_tokens) const;
 
     // can reuse the llm_graph_result instance of the context (for example to update a memory module)
     llm_graph_result * get_gf_res_reserve() const;
-
-    static bool lp_eval_callback(struct ggml_tensor * t, bool ask, void * user_data);
 
     // returns the result of ggml_backend_sched_graph_compute_async execution
     ggml_status graph_compute(ggml_cgraph * gf, bool batched);
 
     // reserve a graph with a dummy ubatch of the specified size
-    ggml_cgraph * graph_reserve(uint32_t n_tokens, uint32_t n_seqs, uint32_t n_outputs, const llama_memory_context_i * mctx, bool split_only = false);
+    ggml_cgraph * graph_reserve(
+        uint32_t n_tokens, uint32_t n_seqs, uint32_t n_outputs, const llama_memory_context_i * mctx, bool split_only = false, size_t * sizes = nullptr);
+
+    bool set_sampler(llama_seq_id seq_id, llama_sampler * sampler);
 
 private:
     llm_graph_params graph_params(
@@ -244,7 +263,6 @@ private:
     llama_cparams       cparams;
     llama_adapter_cvec  cvec;
     llama_adapter_loras loras;
-    llama_igparams      igparams;
 
     llama_cross cross; // TODO: tmp for handling cross-attention - need something better probably
 
@@ -258,6 +276,31 @@ private:
     // populated only when pooling_type == LLAMA_POOLING_TYPE_NONE
     size_t  embd_size = 0; // capacity (of floats) for embeddings
     float * embd      = nullptr;
+
+    // TODO: simplify
+    struct sampling_info {
+        std::map<llama_seq_id, llama_sampler *> samplers;
+
+        float       * logits      = nullptr;
+        size_t        logits_size = 0;
+
+        llama_token * sampled      = nullptr;
+        size_t        sampled_size = 0;
+
+        float       * probs        = nullptr;
+        size_t        probs_size   = 0;
+
+        llama_token * candidates   = nullptr;
+        size_t        candidates_size = 0;
+
+        std::vector<uint32_t> logits_count;
+        std::vector<uint32_t> probs_count;
+        std::vector<uint32_t> candidates_count;
+
+        std::vector<llama_token> token_ids_full_vocab;
+    };
+
+    sampling_info sampling;
 
     // sequence embeddings output (map of [n_embd] vectors)
     // populated only when pooling_type != LLAMA_POOLING_TYPE_NONE
@@ -279,6 +322,8 @@ private:
 
     ggml_backend_sched_ptr sched;
 
+    bool sched_need_reserve = true;
+
     ggml_backend_t backend_cpu = nullptr;
     std::vector<ggml_backend_ptr> backends;
 
@@ -293,9 +338,10 @@ private:
 
     std::vector<std::pair<ggml_backend_t, ggml_backend_set_n_threads_t>> set_n_threads_fns;
 
-    // buffer types used for the compute buffer of each backend
+    // pointers and buffer types used for the compute buffer of each backend
     std::vector<ggml_backend_t>             backend_ptrs;
     std::vector<ggml_backend_buffer_type_t> backend_buft;
+    std::vector<size_t>                     backend_buf_exp_size; // expected buffer sizes
 
     llm_graph_result_ptr gf_res_prev;
     llm_graph_result_ptr gf_res_reserve;
@@ -321,22 +367,4 @@ private:
     mutable int32_t n_eval   = 0; // number of eval calls
 
     mutable int32_t n_reused = 0; // number of times the previous graph was reused
-
-    //
-    // ignite: layer-pause
-    //
-private:
-    enum class lp_mha_key_t { none, attn_out, kqv_out };
-    bool lp_enable = true;
-    bool lp_is_prefill = false;
-    mutable bool seen_attn_out = false;
-    mutable bool seen_kqv_out = false;
-    mutable lp_mha_key_t lp_mha_key = lp_mha_key_t::none;
-    friend void llama_ignite_set_active(struct llama_context * ctx, bool active);
-    friend bool llama_ignite_get_active(struct llama_context * ctx);
-    friend void llama_ignite_set_layer_pause(struct llama_context * ctx,  uint16_t ms);
-    friend uint16_t llama_ignite_get_layer_pause(struct llama_context * ctx);
-
-public:
-    struct llama_igparams get_ignite_ctx();
 };

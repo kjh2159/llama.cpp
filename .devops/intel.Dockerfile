@@ -1,12 +1,12 @@
-ARG ONEAPI_VERSION=2025.0.0-0-devel-ubuntu22.04
+ARG ONEAPI_VERSION=2025.2.2-0-devel-ubuntu24.04
 
 ## Build Image
 
-FROM intel/oneapi-basekit:$ONEAPI_VERSION AS build
+FROM intel/deep-learning-essentials:$ONEAPI_VERSION AS build
 
 ARG GGML_SYCL_F16=OFF
 RUN apt-get update && \
-    apt-get install -y git libcurl4-openssl-dev
+    apt-get install -y git libssl-dev
 
 WORKDIR /app
 
@@ -17,11 +17,11 @@ RUN if [ "${GGML_SYCL_F16}" = "ON" ]; then \
         && export OPT_SYCL_F16="-DGGML_SYCL_F16=ON"; \
     fi && \
     echo "Building with dynamic libs" && \
-    cmake -B build -DGGML_NATIVE=OFF -DGGML_SYCL=ON -DCMAKE_C_COMPILER=icx -DCMAKE_CXX_COMPILER=icpx -DLLAMA_CURL=ON ${OPT_SYCL_F16} && \
+    cmake -B build -DGGML_NATIVE=OFF -DGGML_SYCL=ON -DCMAKE_C_COMPILER=icx -DCMAKE_CXX_COMPILER=icpx -DGGML_BACKEND_DL=ON -DGGML_CPU_ALL_VARIANTS=ON -DLLAMA_BUILD_TESTS=OFF ${OPT_SYCL_F16} && \
     cmake --build build --config Release -j$(nproc)
 
 RUN mkdir -p /app/lib && \
-    find build -name "*.so" -exec cp {} /app/lib \;
+    find build -name "*.so*" -exec cp -P {} /app/lib \;
 
 RUN mkdir -p /app/full \
     && cp build/bin/* /app/full \
@@ -31,7 +31,7 @@ RUN mkdir -p /app/full \
     && cp requirements.txt /app/full \
     && cp .devops/tools.sh /app/full/tools.sh
 
-FROM intel/oneapi-basekit:$ONEAPI_VERSION AS base
+FROM intel/deep-learning-essentials:$ONEAPI_VERSION AS base
 
 RUN apt-get update \
     && apt-get install -y libgomp1 curl\
@@ -49,19 +49,23 @@ COPY --from=build /app/full /app
 
 WORKDIR /app
 
-RUN apt-get update \
-    && apt-get install -y \
-    git \
-    python3 \
-    python3-pip \
-    && pip install --upgrade pip setuptools wheel \
-    && pip install -r requirements.txt \
-    && apt autoremove -y \
-    && apt clean -y \
-    && rm -rf /tmp/* /var/tmp/* \
-    && find /var/cache/apt/archives /var/lib/apt/lists -not -name lock -type f -delete \
-    && find /var/cache -type f -delete
+RUN apt-get update && \
+    apt-get install -y \
+        git \
+        python3 \
+        python3-pip \
+        python3-venv && \
+    python3 -m venv /opt/venv && \
+    . /opt/venv/bin/activate && \
+    pip install --upgrade pip setuptools wheel && \
+    pip install -r requirements.txt && \
+    apt autoremove -y && \
+    apt clean -y && \
+    rm -rf /tmp/* /var/tmp/* && \
+    find /var/cache/apt/archives /var/lib/apt/lists -not -name lock -type f -delete && \
+    find /var/cache -type f -delete
 
+ENV PATH="/opt/venv/bin:$PATH"
 
 ENTRYPOINT ["/app/tools.sh"]
 
@@ -69,7 +73,7 @@ ENTRYPOINT ["/app/tools.sh"]
 FROM base AS light
 
 COPY --from=build /app/lib/ /app
-COPY --from=build /app/full/llama-cli /app
+COPY --from=build /app/full/llama-cli /app/full/llama-completion /app
 
 WORKDIR /app
 
