@@ -1110,7 +1110,12 @@ int main(int argc, char ** argv) {
                     llama_perf_context_reset(ctx);
                     n_past = 0; n_consumed = 0; waiting_for_first_input = true;
                     common_sampler_reset(smpl);
-                    
+
+                    generation_started = false;
+                    n_remain = params.n_predict;
+                    ga_i = 0;
+                    is_antiprompt = false;
+
                     // logger info
                     LOG_INF("[%zu/%zu] ", current_question_index, max_query_num);
                     // LOG_INF("Using question from file: %s\n", buffer.c_str());
