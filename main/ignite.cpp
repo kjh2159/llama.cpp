@@ -38,10 +38,6 @@
 #include "hard/dvfs.h"
 #include "hard/utils.h"
 #include "hard/affinity.h"
-#include "json.hpp"
-
-using json = nlohmann::json;
-namespace fs = std::filesystem;
 
 static llama_context           ** g_ctx;
 static llama_model             ** g_model;
@@ -54,28 +50,11 @@ static bool is_interacting  = false;
 static bool need_insert_eot = false;
 std::atomic_bool sigterm(false);
 
-bool is_csv_file(const std::string & filename) {
-    fs::path p(filename);
-    if (fs::exists(p) && p.extension() == ".csv") {
-        return true;
-    }
-    return false;
-}
-
-bool is_json_file(const std::string & filename) {
-    fs::path p(filename);
-    if (fs::exists(p) && p.extension() == ".json") {
-        return true;
-    }
-    return false;
-}
-
-
 void ctx_kv_cache_clear(struct llama_context * ctx) {
     //llama_kv_cache_clear(ctx); //deprecated
     auto* mem = llama_get_memory(ctx);
     llama_memory_clear(mem, true);
-}
+} 
 
 std::tuple<int, double, int, double> llama_perf_context_print_custom(const struct llama_context * ctx, const std::string & output_filename, std::chrono::time_point<std::chrono::system_clock> start_sys_time) {
     const auto data = llama_perf_context(ctx);
@@ -105,54 +84,6 @@ std::tuple<int, double, int, double> llama_perf_context_print_custom(const struc
     }
 
     return std::make_tuple(data.n_p_eval, 1e3 / data.t_p_eval_ms * data.n_p_eval, data.n_eval, 1e3 / data.t_eval_ms * data.n_eval);
-}
-
-std::vector<std::string> loadQuestions(const std::string &filename) {
-    std::vector<std::string> questions;
-    // csv case
-    if (is_csv_file(filename)) {
-        std::vector<std::vector<std::string>> csvData = readCSV(filename);
-        if (!csvData.empty()) {
-            // If CSV data is found, extract the first column as questions
-            for (const auto& row : csvData) {
-                if (!row.empty()) {
-                        questions.push_back(row[1]);
-                    }
-                }
-            return questions;
-        }
-    }
-
-// A parsing function for "questions.json" with very simple way
-// The following is JSON file type:
-// {
-//   "questions": [
-//     "the first content of question",
-//     "the second content of question",
-//     "the third content of question"
-//   ]
-// }
-
-    if (is_json_file(filename)) {
-        std::ifstream file(filename);
-        try {
-            json jsonData; file >> jsonData; // JSON parsing
-
-            if (jsonData.contains("questions") && jsonData["questions"].is_array()) {
-                for (const auto& item : jsonData["questions"]) {
-                    if (item.is_string()) { questions.push_back(item.get<std::string>()); }
-                }
-            } else { std::cerr << "Invalid JSON format: 'data' key missing or not an array\n"; }
-        } catch (const std::exception &e) {
-            std::cerr << "JSON parsing error: " << e.what() << "\n";
-        }
-        return questions;
-    }
-
-    // no supported
-    std::cerr << "Unsupported file format. Did not read: " << filename << "\n";
-
-    return questions;
 }
 
 static void print_usage(int argc, char ** argv) {

@@ -1,9 +1,20 @@
 #include "utils.h"
-#include <fstream>
-#include <sstream>
-#include <iostream>
 
-std::vector<std::string> parseCSVLine(const std::string& line) {
+bool is_csv_file(const std::string & filename) {
+    fs::path p(filename);
+    if (fs::exists(p) && p.extension() == ".csv") {
+        return true;
+    }
+    return false;
+}
+bool is_json_file(const std::string & filename) {
+    fs::path p(filename);
+    if (fs::exists(p) && p.extension() == ".json") {
+        return true;
+    }
+    return false;
+}
+static std::vector<std::string> parseCSVLine(const std::string& line) {
     std::vector<std::string> values;
     std::string current;
     bool insideQuotes = false;
@@ -39,6 +50,52 @@ std::vector<std::vector<std::string>> readCSV(const std::string& filename) {
 
     file.close();
     return result;
+}
+
+std::vector<std::string> readJSON(const std::string& filename){
+    // A parsing function for "questions.json" with very simple way
+    // The following is JSON file type:
+    // {
+    //   "questions": [
+    //     "the first content of question",
+    //     "the second content of question",
+    //     "the third content of question"
+    //   ]
+    // }
+    std::ifstream file(filename);
+    std::vector<std::string> qs;
+    try {
+        json jsonData; file >> jsonData; // JSON parsing
+
+        if (jsonData.contains("questions") && jsonData["questions"].is_array()) {
+            for (const auto& item : jsonData["questions"]) {
+                if (item.is_string()) { qs.push_back(item.get<std::string>()); }
+            }
+        } else { std::cerr << "Invalid JSON format: 'data' key missing or not an array\n"; }
+    } catch (const std::exception &e) {
+        std::cerr << "JSON parsing error: " << e.what() << "\n";
+    }
+    return qs;
+}
+
+std::vector<std::string> loadQuestions(const std::string &filename) {
+    std::vector<std::string> questions;
+    // csv case
+    if (is_csv_file(filename)) {
+        // If CSV data is found, extract the second column as questions
+        for (const auto& row : readCSV(filename)) {
+            if (!row.empty()) questions.push_back(row[1]);
+        }
+        return questions;
+    }
+
+    // json case
+    if (is_json_file(filename)) return readJSON(filename);
+
+    // no supported
+    std::cerr << "Unsupported file format. Did not read: " << filename << "\n";
+
+    return questions;
 }
 
 std::string joinPaths(const std::string& path1, const std::string& path2) {

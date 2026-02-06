@@ -54,11 +54,13 @@ add_library(dvfs
 
 target_include_directories(llama PRIVATE .)
 target_include_directories(llama PUBLIC ../include)
+target_include_directories(llama PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/../vendor")
 target_compile_features   (llama PRIVATE cxx_std_17) # don't bump
 target_link_libraries(llama PUBLIC ggml)
 
 target_include_directories(dvfs PRIVATE .)
 target_include_directories(dvfs PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(dvfs PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/../vendor")
 target_compile_features   (dvfs PRIVATE cxx_std_17) # don't bump
 target_link_libraries(dvfs PUBLIC ggml)
 if (IGNITE_USE_SYSTEM_DVFS)
