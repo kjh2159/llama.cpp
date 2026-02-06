@@ -41,6 +41,7 @@
 #include "json.hpp"
 
 using json = nlohmann::json;
+namespace fs = std::filesystem;
 
 static llama_context           ** g_ctx;
 static llama_model             ** g_model;
@@ -52,6 +53,23 @@ static std::vector<llama_token> * g_output_tokens;
 static bool is_interacting  = false;
 static bool need_insert_eot = false;
 std::atomic_bool sigterm(false);
+
+bool is_csv_file(const std::string & filename) {
+    fs::path p(filename);
+    if (fs::exists(p) && p.extension() == ".csv") {
+        return true;
+    }
+    return false;
+}
+
+bool is_json_file(const std::string & filename) {
+    fs::path p(filename);
+    if (fs::exists(p) && p.extension() == ".json") {
+        return true;
+    }
+    return false;
+}
+
 
 void ctx_kv_cache_clear(struct llama_context * ctx) {
     //llama_kv_cache_clear(ctx); //deprecated
@@ -90,6 +108,21 @@ std::tuple<int, double, int, double> llama_perf_context_print_custom(const struc
 }
 
 std::vector<std::string> loadQuestions(const std::string &filename) {
+    std::vector<std::string> questions;
+    // csv case
+    if (is_csv_file(filename)) {
+        std::vector<std::vector<std::string>> csvData = readCSV(filename);
+        if (!csvData.empty()) {
+            // If CSV data is found, extract the first column as questions
+            for (const auto& row : csvData) {
+                if (!row.empty()) {
+                        questions.push_back(row[1]);
+                    }
+                }
+            return questions;
+        }
+    }
+
 // A parsing function for "questions.json" with very simple way
 // The following is JSON file type:
 // {
@@ -99,30 +132,25 @@ std::vector<std::string> loadQuestions(const std::string &filename) {
 //     "the third content of question"
 //   ]
 // }
-    std::vector<std::string> questions;
-    std::ifstream file(filename);
-    
-    if (!file) {
-        std::cerr << "Failed to open " << filename << ". Exiting.\n";
+
+    if (is_json_file(filename)) {
+        std::ifstream file(filename);
+        try {
+            json jsonData; file >> jsonData; // JSON parsing
+
+            if (jsonData.contains("questions") && jsonData["questions"].is_array()) {
+                for (const auto& item : jsonData["questions"]) {
+                    if (item.is_string()) { questions.push_back(item.get<std::string>()); }
+                }
+            } else { std::cerr << "Invalid JSON format: 'data' key missing or not an array\n"; }
+        } catch (const std::exception &e) {
+            std::cerr << "JSON parsing error: " << e.what() << "\n";
+        }
         return questions;
     }
 
-    try {
-        json jsonData;
-        file >> jsonData; // JSON parsing
-
-        if (jsonData.contains("questions") && jsonData["questions"].is_array()) {
-            for (const auto& item : jsonData["questions"]) {
-                if (item.is_string()) {
-                    questions.push_back(item.get<std::string>());
-                }
-            }
-        } else {
-            std::cerr << "Invalid JSON format: 'data' key missing or not an array\n";
-        }
-    } catch (const std::exception &e) {
-        std::cerr << "JSON parsing error: " << e.what() << "\n";
-    }
+    // no supported
+    std::cerr << "Unsupported file format. Did not read: " << filename << "\n";
 
     return questions;
 }
@@ -335,13 +363,7 @@ int main(int argc, char ** argv) {
     }
 
 // --------------------------------------------------
-//  for stream
-    // TODO: change
-    // deprecated
-    // std::string output_path = replace(params.output_csv_path, ".csv", "_infer.csv");
-    // std::string output_txt_path = replace(output_path, "_infer.csv", "_hard.txt");
-    std::string json_path = params.json_path;
-    
+// for stream
 
 // for ignite (resource)
     std::string device_name = params.device_name;
@@ -594,17 +616,17 @@ int main(int argc, char ** argv) {
 
 //------------------------------------------------
     // Input json file instead of cli input
-    std::vector<std::string> json_questions;
-    size_t current_question_index = 0;
+    std::vector<std::string> questions;
+    size_t current_question_index = is_json_file(ig->input_path) ? 0 : 1;
     if (params.interactive) {
-        json_questions = loadQuestions(json_path);
-        // if (json_questions.empty()) {
-        //     LOG_ERR("No questions loaded from %s. Exiting interactive mode.\n", json_path.c_str());
+        questions = loadQuestions(ig->input_path); // only json or csv
+        // if (questions.empty()) {
+        //     LOG_ERR("No questions loaded from %s. Exiting interactive mode.\n", ig->input_path.c_str());
         //     return 1;
         // }
     }
     bool custom_max_query = ig->max_query_number == -1 ? false : true;
-    unsigned int max_query_num = custom_max_query ? ig->max_query_number : json_questions.size();
+    unsigned int max_query_num = custom_max_query ? ig->max_query_number : questions.size();
     // JSON questions load done
 //------------------------------------------------
 
@@ -1134,7 +1156,7 @@ int main(int argc, char ** argv) {
 
 // ------------------------------------------------
                 // seamless user-input/json-query mode 
-                if (json_questions.size() == 0){
+                if (questions.size() == 0){
                     // 1. user-input mode
                     // !! not supported !!
                     std::string line;
@@ -1147,9 +1169,8 @@ int main(int argc, char ** argv) {
                     // 2. json-query mode
                     // Use next question from JSON file
                     // TODO: apply seamless think mode only Qwen3.
-                    current_question_index += 1;
                     buffer = "/no_think "; // see `general.architecture`
-                    auto tmp = json_questions[current_question_index];
+                    auto tmp = questions[current_question_index]; current_question_index += 1;
                     buffer += tmp;
                     
                     // context reset for new question
@@ -1168,10 +1189,10 @@ int main(int argc, char ** argv) {
                     inference_start_time = std::chrono::steady_clock::now();
                     inference_started = true;
                 } else if (current_question_index >= ig->max_query_number) {
-                    LOG_INF("Reached maximum query number (%d) from %s. Exiting interactive mode.\n", ig->max_query_number, json_path.c_str());
+                    LOG_INF("Reached maximum query number (%d) from %s. Exiting interactive mode.\n", ig->max_query_number, ig->input_path);
                     break;
                 } else {
-                    LOG_INF("No more questions available in %s. Exiting interactive mode.\n", json_path.c_str());
+                    LOG_INF("No more questions available in %s. Exiting interactive mode.\n", ig->input_path);
                     break;
                 }
 // ------------------------------------------------

@@ -1792,14 +1792,6 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
 
 // dvfs options (ignite)
     add_opt(common_arg(
-        {"--csv-path"}, "FNAME",
-        "path to CSV file for logging outputs (default: none)",
-        [](common_params & params, const std::string & value) {
-            params.csv_path = value;
-        }
-    ).set_examples({LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_MAIN}));
-
-    add_opt(common_arg(
         {"--max-query-number"}, "MQN",
         "maximum number of rows to store in CSV file (default: unlimited)",
         [](common_params & params, int value) {
@@ -1836,6 +1828,14 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
         "set strict limit length (for ouput length)",
         [](common_params & params, int value) {
             params.strict_limit_length = value;
+        }
+    ).set_examples({LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_MAIN}));
+
+    add_opt(common_arg(
+        {"--input-path"}, "IP",
+        "path to input file (default: none, [ .csv | .json ])",
+        [](common_params & params, const std::string & value) {
+            params.input_path = value;
         }
     ).set_examples({LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_MAIN}));
 
@@ -1878,14 +1878,6 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
             params.ram_clk_idx_d = value;
         }
     ).set_examples({LLAMA_EXAMPLE_MAIN}));
-
-   add_opt(common_arg(
-        {"--json-path"}, "JS",
-        "path of json file",
-        [](common_params & params, const std::string & value) {
-            params.json_path = value;
-        }
-    ).set_examples({LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_MAIN}));
 
     add_opt(common_arg(
         {"--phase-pause"}, "PP",

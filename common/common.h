@@ -521,11 +521,9 @@ struct common_params {
     bool ignite_verbose = false;
 
     // basic measure configs
-    int max_query_number = -1;       // limit of CSV questions (0=no limit) // deprecated in future
-    std::string csv_path = ""; // path to CSV questions (empty=none) // deprecated in future
-    std::string json_path = "questions.json"; // deprecated in future
+    int max_query_number = -1;       // limit of input questions (0=no limit) // deprecated in future
+    std::string input_path = "questions.json"; // path = dir/file.ext
     std::string output_csv_path; // deprecated in future
-    std::string input_path = ""; // path = dir/file.ext
     std::string output_dir = "";
     std::string output_path_hard = "";
     std::string output_path_infer = "";

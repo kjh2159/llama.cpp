@@ -406,8 +406,7 @@ extern "C" {
         double decode_speed; // tokens/s
 
         // basic measure configs
-        int max_query_number;       // limit of CSV questions (0=no limit) // deprecated in future
-        char json_path[128]; // deprecated in future
+        int max_query_number;       // limit of input questions (0=no limit) // deprecated in future
         char output_csv_path[128]; // deprecated in future
         char input_path[128]; // path = dir/file.ext
         char output_dir[128];
