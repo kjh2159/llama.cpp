@@ -517,8 +517,13 @@ struct common_params {
     bool prefill_phase = true; // prefill phase or not
     double prefill_speed = 0.0; // tokens/s
     double decode_speed = 0.0; // tokens/s
+    #if defined (IGNITE_USE_SYSTEM_DVFS)
+    bool is_ignite_active = true;
+    bool ignite_verbose = false;
+    #else
     bool is_ignite_active = false;
     bool ignite_verbose = false;
+    #endif
 
     // basic measure configs
     int max_query_number = -1;       // limit of input questions (0=no limit) // deprecated in future

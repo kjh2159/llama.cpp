@@ -138,13 +138,10 @@ int main(int argc, char ** argv) {
     /*
     -- parameter list for ignite --
         # for stream
-            - json_path;        // JSON file path (not used)
-            - csv_path;         // CSV file path
-            - output_csv_path;  // output path
-            - csv_limit;        // limit of CSV questions (0=no limit)
-          x  - interface         // interface mode (0: only processing, 1: print result)
-          x  - qa_start         // start line of QA (0: from the first line)
-
+            - input_path;        // json, csv file path
+            - output_path;       // output path
+            - csv_limit;         // limit of CSV questions (0=no limit)
+            - strict;
 
         # for dvfs
             - device_name;      // device name
@@ -158,7 +155,6 @@ int main(int argc, char ** argv) {
     */
     
     common_init();
-    params.is_ignite_active = true;
     auto & sparams = params.sampling;
 
     // save choice to use color for later
