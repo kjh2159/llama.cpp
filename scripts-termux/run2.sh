@@ -12,7 +12,6 @@ su -c "echo 0 > /sys/class/backlight/panel0-backlight/brightness"
 
 ./build/bin/ignite \
     -m ~/.cache/llama.cpp/tensorblock_Qwen1.5-0.5B-GGUF_Qwen1.5-0.5B-Q4_K.gguf \ 
-    -i -cnv -tb 1 -t 4 -ub 512 -b 512 \
     -c 1024 \
     --temp 0 \
     --top-k 1 \
@@ -25,7 +24,8 @@ su -c "echo 0 > /sys/class/backlight/panel0-backlight/brightness"
     --cpu-p 12 \
     --ram-d 11 \
     --cpu-p 12 \
-    --ram-d 11
+    --ram-d 11 \
+    --ignite-verbose
 
 
 # su -c "echo 1 > /sys/devices/system/cpu/cpu1/online"

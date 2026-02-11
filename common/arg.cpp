@@ -1808,10 +1808,10 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
     ).set_examples({LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_MAIN}));
 
     add_opt(common_arg(
-        {"--ignite-verbose"}, "IV",
+        {"--ignite-verbose"},
         "enable verbose logging for ignite",
-        [](common_params & params, const std::string & value) {
-            params.ignite_verbose = is_truthy(value);
+        [](common_params & params) {
+            params.ignite_verbose = true;
         }
     ).set_examples({LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_MAIN}));
 
