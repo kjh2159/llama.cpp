@@ -831,30 +831,32 @@ int main(int argc, char ** argv) {
 // ------------------------------------------------
                 // prefill/decode detector
                 if (!generation_started) {
+                    // prefill phase
                     if (!prefill_active && ig->is_ignite_active) {
                         #if IGNITE_USE_SYSTEM_DVFS
                         std::vector<int> cpu_freq_indices = dvfs.get_cpu_freqs_conf(ig->cpu_clk_idx_p);
                         dvfs.set_cpu_freq(cpu_freq_indices);
                         dvfs.set_ram_freq(ig->ram_clk_idx_p);
                         #endif // IGNITE_USE_SYSTEM_DVFS
-                        // std::cout << std::flush << "<prefill_setup>"; // test
+                        // std::cout << std::flush << "<prefill_setup>";
                     }
                     if (!prefill_active) {  
                         prefill_active = true; decode_active = false;
-                        std::cout << std::flush << "<prefill>";
+                        // std::cout << std::flush << "<prefill>";
                     }
                 } else {
+                    // decode phase
                     if (!decode_active && ig->is_ignite_active) {
                         #if IGNITE_USE_SYSTEM_DVFS
                         std::vector<int> cpu_freq_indices = dvfs.get_cpu_freqs_conf(ig->cpu_clk_idx_d);
                         dvfs.set_cpu_freq(cpu_freq_indices);
                         dvfs.set_ram_freq(ig->ram_clk_idx_d);
                         #endif // IGNITE_USE_SYSTEM_DVFS
-                        // std::cout << std::flush << "<decode_setup>"; // test
+                        // std::cout << std::flush << "<decode_setup>";
                     }
                     if (!decode_active) {  
                         prefill_active = false; decode_active = true;
-                        std::cout << std::flush << "<decode>";
+                        // std::cout << std::flush << "<decode>";
                     }
                 }
 // ------------------------------------------------

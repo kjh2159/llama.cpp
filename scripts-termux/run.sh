@@ -27,6 +27,7 @@ su -c "echo 0 > /sys/class/backlight/panel0-backlight/brightness"
     --cpu-p 12 \
     --ram-d 11
 
+# --layer-pause LP[ms]
 
 # su -c "echo 1 > /sys/devices/system/cpu/cpu1/online"
 # su -c "echo 1 > /sys/devices/system/cpu/cpu2/online"
