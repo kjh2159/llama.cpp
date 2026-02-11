@@ -320,13 +320,11 @@ int main(int argc, char ** argv) {
     dvfs.output_filename = std::string(ig->output_path_hard);
     //printf("%s: hard output path: %s\n", __func__, ig->output_path_hard); // debug
     // [26.01.21] now, inference result path is set by ig->output_path_infer. (see #L1074)
-    
     // set cpu & ram freqs
     std::vector<int> cpu_freq_indices = dvfs.get_cpu_freqs_conf(params.cpu_clk_idx_p);
     dvfs.set_cpu_freq(cpu_freq_indices);
     dvfs.set_ram_freq(params.ram_clk_idx_p);
 // --------------------------------------------------
-
 
     
 // --------------------------------------------------
@@ -346,6 +344,7 @@ int main(int argc, char ** argv) {
     //std::packaged_task<void()> task([&dvfs] { record_hard(std::ref(sigterm), dvfs); });
     //std::future<void> result = task.get_future();
     //std::thread(std::move(task)).detach();
+    
     std::thread record_thread = std::thread(record_hard, std::ref(sigterm), std::ref(dvfs));
     auto start_sys_time = std::chrono::system_clock::now();
     pin_current({4,5,6,7}); // generally gold/prime cores on mobile
@@ -355,7 +354,6 @@ int main(int argc, char ** argv) {
     init_ignite_filename(ctx);
     auto ig = get_ignite_params(ctx); // ignite parameters
     dvfs.output_filename = std::string(ig->output_path_hard);
-    std::cout << "IGNITE is OFF now.\r\n";
     auto start_sys_time = std::chrono::system_clock::now();
 #endif
     ignite_params_system_info(ig);

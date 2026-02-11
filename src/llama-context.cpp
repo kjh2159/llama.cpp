@@ -1467,18 +1467,24 @@ bool llama_context::lp_eval_callback(struct ggml_tensor* t, bool ask, void* user
     if (!n || !n[0]) return true;
 
     // inject in MHA and FFN.
-    // MHA
+    // MHA: attn_out (llama series) or kqv_out (Qwen series)
     if (strncmp(n, "attn_out", 8)  == 0 && ctx->lp_mha_key == lp_mha_key_t::attn_out) {
-        std::cout << std::flush << "<mha:" << ctx->igparams.layer_pause << ">";
-        // std::this_thread::sleep_for(std::chrono::milliseconds(ctx->igparams.layer_pause));
+        // verbose output
+        if (ctx->igparams.ignite_verbose) std::cout << std::flush << "<mha:" << ctx->igparams.layer_pause << ">";
+        // layer pause for MHA
+        std::this_thread::sleep_for(std::chrono::milliseconds(ctx->igparams.layer_pause));
     }  else if (strncmp(n, "kqv_out", 7)  == 0 && ctx->lp_mha_key == lp_mha_key_t::kqv_out) {
-        std::cout << std::flush << "<kqv" << ctx->igparams.layer_pause << ">";
-        // std::this_thread::sleep_for(std::chrono::milliseconds(ctx->igparams.layer_pause));
+        // verbose output
+        if (ctx->igparams.ignite_verbose) std::cout << std::flush << "<kqv:" << ctx->igparams.layer_pause << ">";
+        // layer pause for MHA
+        std::this_thread::sleep_for(std::chrono::milliseconds(ctx->igparams.layer_pause));
     }
     // FFN
     if (strncmp(n, "ffn_out", 7) == 0 || strncmp(n, "ffn_mlp", 7) == 0) {
-        std::cout << std::flush << "<ffn" << ctx->igparams.layer_pause << ">";
-        // std::this_thread::sleep_for(std::chrono::milliseconds(ctx->igparams.layer_pause));
+        // verbose output
+        if (ctx->igparams.ignite_verbose) std::cout << std::flush << "<ffn:" << ctx->igparams.layer_pause << ">";
+        // layer pause for FFN
+        std::this_thread::sleep_for(std::chrono::milliseconds(ctx->igparams.layer_pause));
     }
 
     return true;
@@ -1505,8 +1511,7 @@ ggml_status llama_context::graph_compute(
     }
 //--------------------------------------------------
     // register lp_eval_callback function to eval scheduler (inject into only prefill phase)
-    // [26.01.22] ignite_verbose should be eliminated in the future.
-    if (igparams.is_ignite_active && igparams.ignite_verbose) ggml_backend_sched_set_eval_callback(sched.get(), lp_eval_callback, this);
+    if (igparams.is_ignite_active) ggml_backend_sched_set_eval_callback(sched.get(), lp_eval_callback, this);
 //--------------------------------------------------
     auto status = ggml_backend_sched_graph_compute_async(sched.get(), gf);
     if (status != GGML_STATUS_SUCCESS) {
