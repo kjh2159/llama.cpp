@@ -11,20 +11,21 @@ su -c "echo 0 > /sys/class/backlight/panel0-backlight/brightness"
 
 
 ./build/bin/ignite \
-    -m ~/.cache/llama.cpp/tensorblock_Qwen1.5-0.5B-GGUF_Qwen1.5-0.5B-Q4_K.gguf \ 
-    -i -cnv -tb 1 -t 4 -ub 512 -b 512 \
+    -m models/qwen-3-0.6b-q4k.gguf \
+    -i -cnv -tb 4 -t 1 -ub 512 -b 512 \
     -c 1024 \
     --temp 0 \
     --top-k 1 \
+    --top-p 0 \
     --device-name Pixel9 \
     --output-dir outputs/ \
-    --json-path dataset/hotpot_qa_30.json \
+    --input-path dataset/hotpot_qa_30.json \
     --strict on \
-    --strict-length 64 \
+    --strict-limit 64 \
     --max-query-number 20 \
     --cpu-p 12 \
-    --ram-d 11 \
-    --cpu-p 12 \
+    --ram-p 11 \
+    --cpu-d 12 \
     --ram-d 11
 
 # --layer-pause LP[ms]
