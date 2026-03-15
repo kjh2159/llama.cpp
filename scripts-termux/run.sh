@@ -2,7 +2,7 @@
 # this script should be run on llama.cpp/ dir.
 
 # screen brightness control
-su -c "echo 0 > /sys/class/backlight/panel0-backlight/brightness"
+echo 0 > /sys/class/backlight/panel0-backlight/brightness
 
 # silver core control
 # su -c "echo 1 > /sys/devices/system/cpu/cpu1/online"
@@ -35,5 +35,5 @@ su -c "echo 0 > /sys/class/backlight/panel0-backlight/brightness"
 # su -c "echo 1 > /sys/devices/system/cpu/cpu3/online"
 
 # experiment done -> let screen brightness bright again
-su -c "echo 1023 > /sys/class/backlight/panel0-backlight/brightness"
+echo 1023 > /sys/class/backlight/panel0-backlight/brightness
 
