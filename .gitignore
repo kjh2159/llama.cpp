@@ -33,7 +33,7 @@
 /.vs/
 /.vscode/
 /nppBackup
-
+CMakeUserPresets.json
 
 # Coverage
 

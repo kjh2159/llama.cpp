@@ -6,14 +6,19 @@
 #include "llama.h"
 #include "chat.h"
 
+#include "ggml-backend.h"
+
 #include <cstdio>
 #include <cstring>
 #include <ctime>
+#include <cstdint>
+#include <time.h>
 #include <fstream>
 #include <iostream>
 #include <sstream>
 #include <string>
 #include <vector>
+#include <thread>
 #include <tuple>  // to accumulate json
 
 #if defined (__unix__) || (defined (__APPLE__) && defined (__MACH__))
@@ -34,6 +39,13 @@
 
 #include "nlohmann/json.hpp"
 
+
+// dvfs library
+#include "hard/record.h"
+#include "hard/dvfs.h"
+#include "hard/utils.h"
+#include "hard/affinity.h"
+
 using json = nlohmann::json;
 
 static llama_context           ** g_ctx;
@@ -45,6 +57,71 @@ static std::ostringstream       * g_output_ss;
 static std::vector<llama_token> * g_output_tokens;
 static bool is_interacting  = false;
 static bool need_insert_eot = false;
+std::atomic_bool sigterm(false);
+
+static bool should_write_op_breakdown_csv() {
+    const char * env = std::getenv("IGNITE_CSV_OP_BREAKDOWN");
+    if (env == nullptr) {
+        return false;
+    }
+
+    return std::strcmp(env, "1") == 0 || std::strcmp(env, "true") == 0 || std::strcmp(env, "TRUE") == 0;
+}
+
+static void append_profile_csv_op_headers(std::ostream & os) {
+    for (int op = 0; op < GGML_OP_COUNT; ++op) {
+        const char * op_name = ggml_op_name((ggml_op) op);
+        if (op_name == nullptr || op_name[0] == '\0') {
+            op_name = "unknown";
+        }
+        os << ",prefill_cpu_op_" << op_name
+           << ",decode_cpu_op_" << op_name
+           << ",prefill_htp_op_" << op_name
+           << ",decode_htp_op_" << op_name;
+    }
+}
+
+static void append_profile_csv_op_values(std::ostream & os, const ggml_backend_sched_profile_data & prof) {
+    for (int op = 0; op < GGML_OP_COUNT; ++op) {
+        os << "," << prof.prefill_cpu_ops_by_type[op]
+           << "," << prof.decode_cpu_ops_by_type[op]
+           << "," << prof.prefill_htp_ops_by_type[op]
+           << "," << prof.decode_htp_ops_by_type[op];
+    }
+}
+
+
+// Process CPU time helper (user + kernel, sum over all threads)
+// - wall time measures "elapsed time"
+// - process CPU time measures "how much CPU actually executed"
+static int64_t get_process_cpu_time_us() {
+#if defined(_WIN32)
+    FILETIME ft_create, ft_exit, ft_kernel, ft_user;
+    if (!GetProcessTimes(GetCurrentProcess(), &ft_create, &ft_exit, &ft_kernel, &ft_user)) {
+        return -1;
+    }
+    ULARGE_INTEGER k;
+    k.LowPart  = ft_kernel.dwLowDateTime;
+    k.HighPart = ft_kernel.dwHighDateTime;
+    ULARGE_INTEGER u;
+    u.LowPart  = ft_user.dwLowDateTime;
+    u.HighPart = ft_user.dwHighDateTime;
+    // FILETIME is in 100-ns units
+    return (int64_t) ((k.QuadPart + u.QuadPart) / 10);
+#elif defined(CLOCK_PROCESS_CPUTIME_ID)
+    struct timespec ts;
+    if (clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &ts) != 0) {
+        return -1;
+    }
+    return (int64_t) ts.tv_sec * 1000000 + (int64_t) ts.tv_nsec / 1000;
+#else
+    const clock_t c = std::clock();
+    if (c == (clock_t) -1) {
+        return -1;
+    }
+    return (int64_t) ((double) c / (double) CLOCKS_PER_SEC * 1e6);
+#endif
+}
 
 void ctx_kv_cache_clear(struct llama_context * ctx) {
     //llama_kv_cache_clear(ctx); //deprecated
@@ -69,11 +146,41 @@ std::tuple<int, double, int, double> llama_perf_context_print_custom(const struc
     // Convert time_point to time_t (seconds since epoch)
     auto now_sys_time = std::chrono::system_clock::now();
     auto sys_time = std::chrono::duration_cast<std::chrono::milliseconds>(now_sys_time-start_sys_time).count();
+
+    const auto prof = ggml_backend_sched_profile_get();
     // system time, prefill speed, decode speed, prefill tokens, decode tokens, ttft
     std::ofstream file(output_filename, std::ios::app);
     if (file.is_open()) {
         file << std::to_string(sys_time) << "," << ( 1e3 / data.t_p_eval_ms *data.n_p_eval ) << "," << (1e3 / data.t_eval_ms * data.n_eval ) << "," 
-              << data.n_p_eval << ","<< data.n_eval << "," << (data.t_p_eval_ms)<<"\n";
+              << data.n_p_eval << ","<< data.n_eval << "," << (data.t_p_eval_ms)
+              << "," << prof.prefill_cpu_layers
+              << "," << prof.prefill_htp_layers
+              << "," << prof.prefill_cpu_ms
+              << "," << prof.prefill_htp_ms
+              << "," << prof.decode_cpu_layers
+              << "," << prof.decode_htp_layers
+              << "," << prof.decode_cpu_ms
+              << "," << prof.decode_htp_ms
+              << "," << prof.total_ops
+              << "," << prof.prefill_cpu_ops
+              << "," << prof.decode_cpu_ops
+              << "," << prof.prefill_htp_ops
+              << "," << prof.decode_htp_ops
+              << "," << prof.prefill_copy_ms
+              << "," << prof.prefill_wait_ms
+              << "," << prof.prefill_build_ms
+              << "," << prof.prefill_sampling_ms
+              << "," << prof.decode_copy_ms
+              << "," << prof.decode_wait_ms
+              << "," << prof.decode_build_ms
+              << "," << prof.decode_sampling_ms
+              << "," << prof.prefill_proc_cpu_ms
+              << "," << prof.decode_proc_cpu_ms
+              << "," << (prof.prefill_proc_cpu_ms + prof.decode_proc_cpu_ms);
+              if (should_write_op_breakdown_csv()) {
+                append_profile_csv_op_values(file, prof);
+            }
+        file << "\n";
         file.close();
     } else {
         // LLAMA_LOG_INFO("Failed to open file: %s\n", output_filename.c_str());
@@ -515,9 +622,28 @@ int main(int argc, char ** argv) {
     auto start_sys_time = std::chrono::system_clock::now();
     std::ofstream file(output_path_infer, std::ios::app);
     if (file.is_open() && output_path_infer!="/inference_stats.csv") {
-        file << "sys_time, prefill_speed, decode_speed, prefill_token, decode_token, ttft\n";
+        file << "sys_time,prefill_speed,decode_speed,prefill_token,decode_token,ttft,";
+        file << "prefill_cpu_layers,prefill_htp_layers,prefill_cpu_ms,prefill_htp_ms,";
+        file << "decode_cpu_layers,decode_htp_layers,decode_cpu_ms,decode_htp_ms,";
+        file << "total_ops,prefill_cpu_ops,decode_cpu_ops,prefill_htp_ops,decode_htp_ops,";
+        file << "prefill_copy_ms,prefill_wait_ms,prefill_build_ms,prefill_sampling_ms,";
+        file << "decode_copy_ms,decode_wait_ms,decode_build_ms,decode_sampling_ms,prefill_proc_cpu_ms,decode_proc_cpu_ms,proc_cpu_ms_total";
+        if (should_write_op_breakdown_csv()) {
+            append_profile_csv_op_headers(file);
+        }
+        file << "\n";
         file.close();
     }
+
+    // dummy dvfs object
+    std::string device_name = "S25";
+    DVFS dvfs(device_name);
+    dvfs.control_start_point = start_sys_time; // need to be initialized to sync `record_hard` and `inference_stats`.
+    dvfs.output_filename = params.output_dir + "/hardware_stats.csv";
+
+    #if IGNITE_USE_SYSTEM_DVFS
+    std::thread record_thread = std::thread(record_hard, std::ref(sigterm), std::ref(dvfs));
+    #endif
 
     // Input json file instead of cli input
     std::vector<std::string> json_questions;
@@ -796,9 +922,17 @@ int main(int argc, char ** argv) {
                 LOG_DBG("eval: %s\n", string_from(ctx, embd).c_str());
 
                 GGML_ASSERT(n_eval <= params.n_batch);
+
+                const int64_t t_cpu0_us = get_process_cpu_time_us();
+
                 if (llama_decode(ctx, llama_batch_get_one(embd.data(), n_eval))) {
                     LOG_ERR("%s : failed to eval\n", __func__);
                     return 1;
+                }
+
+                const int64_t t_cpu1_us = get_process_cpu_time_us();
+                if (t_cpu0_us >= 0 && t_cpu1_us >= 0) {
+                    ggml_backend_sched_profile_add_proc_cpu_ms((t_cpu1_us - t_cpu0_us) / 1000.0);
                 }
 
                 n_past += n_eval;
@@ -832,9 +966,16 @@ int main(int argc, char ** argv) {
                 LOG_DBG("saved session to %s\n", path_session.c_str());
             }
 
+            const int64_t t_sample_cpu0_us = get_process_cpu_time_us();
+            const int64_t t_sample_us = ggml_time_us();
             const llama_token id = common_sampler_sample(smpl, ctx, -1);
 
             common_sampler_accept(smpl, id, /* accept_grammar= */ true);
+            ggml_backend_sched_profile_add_sampling_ms((ggml_time_us() - t_sample_us) / 1000.0);
+            const int64_t t_sample_cpu1_us = get_process_cpu_time_us();
+            if (t_sample_cpu0_us >= 0 && t_sample_cpu1_us >= 0) {
+                ggml_backend_sched_profile_add_proc_cpu_ms((t_sample_cpu1_us - t_sample_cpu0_us) / 1000.0);
+            }
 
             // LOG_DBG("last: %s\n", string_from(ctx, smpl->prev.to_vector()).c_str());
 
@@ -1035,6 +1176,7 @@ int main(int argc, char ** argv) {
                     ctx_kv_cache_clear(ctx);
                     embd_inp.clear();
                     llama_perf_context_reset(ctx);
+                    ggml_backend_sched_profile_reset();
                     n_past = 0; n_consumed = 0; waiting_for_first_input = true;
                     common_sampler_reset(smpl);
 
@@ -1168,6 +1310,11 @@ int main(int argc, char ** argv) {
             is_interacting = true;
         }
     }
+    
+    #if IGNITE_USE_SYSTEM_DVFS
+    sigterm = true;
+    record_thread.join();
+    #endif
 
     if (!path_session.empty() && params.prompt_cache_all && !params.prompt_cache_ro) {
         LOG("\n%s: saving final output to session file '%s'\n", __func__, path_session.c_str());
