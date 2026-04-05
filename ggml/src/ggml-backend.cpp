@@ -742,13 +742,22 @@ struct ggml_backend_sched {
 //
 // Backend scheduler profiling (process-global, lightweight)
 //
+// This profiling path is intentionally coarse-grained:
+// - phase split: prefill vs decode
+// - backend split: CPU vs HTP
+// - attribution: per-graph wall-time buckets and per-op counters
+//
+// It is currently implemented as process-global mutable state, so it is
+// intended for single-run instrumentation and is not thread-safe.
 
 static ggml_backend_sched_profile_phase g_sched_profile_phase = GGML_BACKEND_SCHED_PROFILE_PREFILL;
 
 struct ggml_backend_sched_profile_state {
     ggml_backend_sched_profile_data out = {};
 
-    // layer-id presence maps (index = layer id)
+    // Layer-id presence maps (index = layer id). These are used to count
+    // unique layers touched in each phase/backend bucket without double
+    // counting repeated ops from the same layer.
     std::vector<uint8_t> prefill_cpu_layers;
     std::vector<uint8_t> prefill_htp_layers;
     std::vector<uint8_t> decode_cpu_layers;
@@ -757,6 +766,8 @@ struct ggml_backend_sched_profile_state {
 
 static ggml_backend_sched_profile_state g_sched_profile;
 
+// Marks a layer id as seen in the target bucket and increments the unique
+// layer count only on the first observation.
 static void ggml_sched_profile_mark_layer(std::vector<uint8_t> & seen, uint32_t & count, int layer_id) {
     if (layer_id < 0) {
         return;
@@ -778,6 +789,7 @@ static void ggml_sched_profile_mark_layer(std::vector<uint8_t> & seen, uint32_t 
 // - "blk.<N>." (weights)
 // - "...-<N>" (intermediates)
 // - "..._l<N>" (kv-cache tensors)
+// This is approximate by design and is only used for lightweight profiling.
 static int ggml_sched_profile_extract_layer_id(const char * name) {
     if (!name || !name[0]) {
         return -1;
@@ -840,8 +852,10 @@ static int ggml_sched_profile_extract_layer_id(const char * name) {
     return -1;
 }
 
+// Scans a scheduled subgraph and records which layer ids were touched by the
+// current phase/backend bucket. A layer may appear in both CPU and HTP buckets
+// if execution for that layer is split across backends.
 static void ggml_sched_profile_note_layers(const ggml_cgraph & graph, bool is_cpu) {
-    // Scan node names in this subgraph and mark discovered layer ids.
     for (int i = 0; i < graph.n_nodes; ++i) {
         const ggml_tensor * t = graph.nodes[i];
         const int layer_id = ggml_sched_profile_extract_layer_id(t ? t->name : nullptr);
@@ -865,6 +879,7 @@ static void ggml_sched_profile_note_layers(const ggml_cgraph & graph, bool is_cp
     }
 }
 
+// Increments per-op counters for the current phase/backend bucket.
 static inline void ggml_sched_profile_add_op_type_count(enum ggml_op op, bool is_cpu) {
     if (op < 0 || op >= GGML_OP_COUNT) {
         return;
@@ -885,6 +900,7 @@ static inline void ggml_sched_profile_add_op_type_count(enum ggml_op op, bool is
     }
 }
 
+// Accumulates ggml op counts for all nodes in the scheduled subgraph.
 static inline void ggml_sched_profile_add_graph_op_type_counts(const ggml_cgraph & graph, bool is_cpu) {
     for (int i = 0; i < graph.n_nodes; ++i) {
         const ggml_tensor * t = graph.nodes[i];
@@ -908,6 +924,7 @@ void ggml_backend_sched_profile_set_phase(enum ggml_backend_sched_profile_phase 
     g_sched_profile_phase = phase;
 }
 
+// Records host-side wall time spent copying tensors for the current phase.
 static inline void ggml_sched_profile_add_copy_us(const int64_t dt_us) {
     const double dt_ms = (double) dt_us / 1000.0;
     if (g_sched_profile_phase == GGML_BACKEND_SCHED_PROFILE_PREFILL) {
@@ -917,6 +934,7 @@ static inline void ggml_sched_profile_add_copy_us(const int64_t dt_us) {
     }
 }
 
+// Records host-side wall time spent waiting on backend work for the current phase.
 static inline void ggml_sched_profile_add_wait_us(const int64_t dt_us) {
     const double dt_ms = (double) dt_us / 1000.0;
     if (g_sched_profile_phase == GGML_BACKEND_SCHED_PROFILE_PREFILL) {
@@ -941,9 +959,6 @@ void ggml_backend_sched_profile_add_sampling_ms(double sampling_ms) {
         g_sched_profile.out.decode_sampling_ms += sampling_ms;
     }
 }
-
-
-
 void ggml_backend_sched_profile_add_proc_cpu_ms(double proc_cpu_ms) {
     if (g_sched_profile_phase == GGML_BACKEND_SCHED_PROFILE_PREFILL) {
         g_sched_profile.out.prefill_proc_cpu_ms += proc_cpu_ms;

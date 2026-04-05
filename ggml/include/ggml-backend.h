@@ -345,6 +345,8 @@ extern "C" {
     //
     // Notes:
     // - This is intended for coarse per-backend and per-phase (prefill/decode) stats.
+    // - Timing buckets combine scheduler-side wall-time with caller-reported
+    //   build/sampling/process-CPU contributions.
     // - The implementation is currently process-global and not thread-safe.
     //
 
@@ -392,15 +394,22 @@ extern "C" {
         double   decode_sampling_ms;
 
         // Process CPU time (user+kernel), ms (sum over all threads)
+        // TODO: Delete these duplicated logs
         double   prefill_proc_cpu_ms;
         double   decode_proc_cpu_ms;
     };
 
+    // Clears all accumulated profiling state and resets the active phase to prefill.
     GGML_API void ggml_backend_sched_profile_reset(void);
+    // Selects which phase subsequent scheduler/caller-reported metrics are charged to.
     GGML_API void ggml_backend_sched_profile_set_phase(enum ggml_backend_sched_profile_phase phase);
+    // Adds caller-reported graph build time (ms) for the active phase.
     GGML_API void ggml_backend_sched_profile_add_build_ms(double build_ms);
+    // Adds caller-reported sampling time (ms) for the active phase.
     GGML_API void ggml_backend_sched_profile_add_sampling_ms(double sampling_ms);
+    // Adds caller-reported process CPU time (ms, user+kernel) for the active phase.
     GGML_API void ggml_backend_sched_profile_add_proc_cpu_ms(double proc_cpu_ms);
+    // Returns a snapshot of the accumulated profiling counters.
     GGML_API struct ggml_backend_sched_profile_data ggml_backend_sched_profile_get(void);
 
     //

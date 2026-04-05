@@ -59,6 +59,9 @@ static bool is_interacting  = false;
 static bool need_insert_eot = false;
 std::atomic_bool sigterm(false);
 
+// Returns true when ignite should append per-op breakdown columns to the
+// profiling CSV. This is an opt-in path controlled by
+// IGNITE_CSV_OP_BREAKDOWN=1|true|TRUE.
 static bool should_write_op_breakdown_csv() {
     const char * env = std::getenv("IGNITE_CSV_OP_BREAKDOWN");
     if (env == nullptr) {
@@ -68,6 +71,10 @@ static bool should_write_op_breakdown_csv() {
     return std::strcmp(env, "1") == 0 || std::strcmp(env, "true") == 0 || std::strcmp(env, "TRUE") == 0;
 }
 
+// Appends per-op CSV headers for the optional op breakdown section.
+// Each ggml op contributes four columns:
+// prefill_cpu, decode_cpu, prefill_htp, decode_htp.
+// TODO: move to utils if this CSV formatting is reused outside ignite-npu.
 static void append_profile_csv_op_headers(std::ostream & os) {
     for (int op = 0; op < GGML_OP_COUNT; ++op) {
         const char * op_name = ggml_op_name((ggml_op) op);
@@ -81,6 +88,8 @@ static void append_profile_csv_op_headers(std::ostream & os) {
     }
 }
 
+// Appends per-op CSV values matching append_profile_csv_op_headers().
+// TODO: move to utils if this CSV formatting is reused outside ignite-npu.
 static void append_profile_csv_op_values(std::ostream & os, const ggml_backend_sched_profile_data & prof) {
     for (int op = 0; op < GGML_OP_COUNT; ++op) {
         os << "," << prof.prefill_cpu_ops_by_type[op]
@@ -140,9 +149,11 @@ std::tuple<int, double, int, double> llama_perf_context_print_custom(const struc
     //         __func__, data.t_eval_ms, data.n_eval, data.t_eval_ms / data.n_eval, 1e3 / data.t_eval_ms * data.n_eval);
     // LLAMA_LOG_INFO("%s:       total time = %10.2f ms / %5d tokens\n", __func__, (t_end_ms - data.t_start_ms), (data.n_p_eval + data.n_eval));
 
-    // Open the CSV file in append mode
-    
-    
+    // Open the CSV file in append mode.
+    // The fixed columns store aggregate throughput/timing counters. When
+    // IGNITE_CSV_OP_BREAKDOWN is enabled, per-op CPU/HTP counts are appended
+    // after the aggregate profiling fields.
+
     // Convert time_point to time_t (seconds since epoch)
     auto now_sys_time = std::chrono::system_clock::now();
     auto sys_time = std::chrono::duration_cast<std::chrono::milliseconds>(now_sys_time-start_sys_time).count();
