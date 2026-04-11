@@ -46,26 +46,16 @@ Through this file, you can download models, which are pre-selected to evaluate t
 If there is no preferred model, you can download and run your own gguf models also.
 
 
-### Build (on-device)
+### Linux
 
-```sh
-cd scripts && sh build-android.sh && cd ..
-```
-
-### Run (on-device)
-
-```sh
-chmod +x scripts-termux/run.sh
-su -c "sh scripts-termux/run.sh"
-```
-
-### Build (Linux)
+**_Build_**
 
 ```sh
 cd scripts && sh build.sh && cd ..
 ```
 
-### Run (Linux)
+**_Run_**
+
 ```sh
 ./build/bin/ignite \
     -m models/qwen-1.5-0.5b-chat-q4k.gguf \
@@ -76,5 +66,22 @@ cd scripts && sh build.sh && cd ..
     --output-path outputs/hotpot_0_0.csv \
     --json-path dataset/hotpot_qa_30.json
 ```
+
+### Android (CLI)
+
+**_Build_**
+
+```sh
+cd scripts && sh build-android.sh && cd ..
+```
+
+**_Run_**
+
+```sh
+chmod +x scripts-termux/run.sh
+su -c "sh scripts-termux/run.sh"
+```
+
+> This build and run are executed on termux.
 
 *This will be filled up. Please wait.*
