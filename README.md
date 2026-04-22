@@ -51,7 +51,7 @@ If there is no preferred model, you can download and run your own gguf models al
 **_Build_**
 
 ```sh
-cd scripts && sh build.sh && cd ..
+cd scripts && sh build-linux.sh && cd ..
 ```
 
 **_Run_**
@@ -72,7 +72,7 @@ cd scripts && sh build.sh && cd ..
 **_Build_**
 
 ```sh
-cd scripts && sh build-android.sh && cd ..
+cd scripts && sh build.sh && cd ..
 ```
 
 **_Run_**
@@ -82,6 +82,6 @@ chmod +x scripts-termux/run.sh
 su -c "sh scripts-termux/run.sh"
 ```
 
-> This build and run are executed on termux.
+> This build and run are executed on Termux.
 
 *This will be filled up. Please wait.*
