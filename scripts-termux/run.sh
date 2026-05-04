@@ -72,7 +72,6 @@ setenforce 0 || true
 export LD_LIBRARY_PATH=/data/local/tmp/llama.cpp/lib
 export ADSP_LIBRARY_PATH=/data/local/tmp/llama.cpp/lib
 export GGML_HEXAGON_HOSTBUF=1
-export IGNITE_CSV_OP_BREAKDOWN=1
 
 cd /data/local/tmp/llama.cpp || exit 1
 
@@ -84,6 +83,8 @@ taskset fe ./bin/llama-ignite-npu \
     --strict on \
     --strict-limit 128 \
     --output-dir output \
+    --backend-compute-profile \
+    --backend-op-breakdown \
     --temp 0 \
     --top-k 1 \
     -c 1024 \

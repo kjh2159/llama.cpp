@@ -1081,6 +1081,7 @@ void llama_context::set_ignite_params(
     LLAMA_LOG_DEBUG("%s: call\n", __func__);
     igparams = *cfg;
     lp_enable = igparams.layer_pause > 0;
+    ggml_backend_sched_profile_set_enabled(igparams.backend_compute_profile);
 }
 
 struct llama_igparams * llama_context::get_ignite_params() {
@@ -1161,11 +1162,14 @@ llm_graph_result * llama_context::process_ubatch(const llama_ubatch & ubatch, ll
         ggml_backend_sched_reset(sched.get());
         ggml_backend_sched_set_eval_callback(sched.get(), cparams.cb_eval, cparams.cb_eval_user_data);
 
-        const int64_t t_build_us = ggml_time_us();
+        const bool profile_backend_compute = igparams.backend_compute_profile;
+        const int64_t t_build_us = profile_backend_compute ? ggml_time_us() : 0;
 
         gf = model.build_graph(gparams);
 
-        ggml_backend_sched_profile_add_build_ms((ggml_time_us() - t_build_us) / 1000.0);
+        if (profile_backend_compute) {
+            ggml_backend_sched_profile_add_build_ms((ggml_time_us() - t_build_us) / 1000.0);
+        }
 
         if (!gf) {
             LLAMA_LOG_ERROR("%s: failed to initialize graph\n", __func__);
@@ -1173,9 +1177,11 @@ llm_graph_result * llama_context::process_ubatch(const llama_ubatch & ubatch, ll
             return nullptr;
         }
 
-        const int64_t t_alloc_us = ggml_time_us();
+        const int64_t t_alloc_us = profile_backend_compute ? ggml_time_us() : 0;
         const bool alloc_ok = ggml_backend_sched_alloc_graph(sched.get(), gf);
-        ggml_backend_sched_profile_add_build_ms((ggml_time_us() - t_alloc_us) / 1000.0);
+        if (profile_backend_compute) {
+            ggml_backend_sched_profile_add_build_ms((ggml_time_us() - t_alloc_us) / 1000.0);
+        }
         if (!alloc_ok) {
             LLAMA_LOG_ERROR("%s: failed to allocate graph\n", __func__);
             ret = GGML_STATUS_ALLOC_FAILED;
@@ -1185,11 +1191,14 @@ llm_graph_result * llama_context::process_ubatch(const llama_ubatch & ubatch, ll
 
     // set the input data for the input tensors
     {
-        const int64_t t_inputs_us = ggml_time_us();
+        const bool profile_backend_compute = igparams.backend_compute_profile;
+        const int64_t t_inputs_us = profile_backend_compute ? ggml_time_us() : 0;
 
         res->set_inputs(&ubatch);
 
-        ggml_backend_sched_profile_add_build_ms((ggml_time_us() - t_inputs_us) / 1000.0);
+        if (profile_backend_compute) {
+            ggml_backend_sched_profile_add_build_ms((ggml_time_us() - t_inputs_us) / 1000.0);
+        }
     }
 
     const auto status = graph_compute(res->get_gf(), ubatch.n_tokens > 1);
@@ -2163,8 +2172,10 @@ ggml_status llama_context::graph_compute(
         ggml_backend_sched_set_eval_callback(sched.get(), nullptr, nullptr);
     }
 
-    // Let ggml scheduler profiling know whether this run is prefill (batched) or decode (single token).
-    ggml_backend_sched_profile_set_phase(batched ? GGML_BACKEND_SCHED_PROFILE_PREFILL : GGML_BACKEND_SCHED_PROFILE_DECODE);
+    ggml_backend_sched_profile_set_enabled(igparams.backend_compute_profile);
+    if (igparams.backend_compute_profile) {
+        ggml_backend_sched_profile_set_phase(batched ? GGML_BACKEND_SCHED_PROFILE_PREFILL : GGML_BACKEND_SCHED_PROFILE_DECODE);
+    }
 
     auto status = ggml_backend_sched_graph_compute_async(sched.get(), gf);
     if (status != GGML_STATUS_SUCCESS) {

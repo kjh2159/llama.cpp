@@ -420,6 +420,8 @@ extern "C" {
         bool is_ignite_active;               // ignite active status
         bool ignite_verbose;                 // enable verbose logging for ignite
         uint16_t layer_pause;                // per-layer pause in milliseconds
+        bool backend_compute_profile;        // enable backend scheduler profiling
+        bool backend_op_breakdown;           // append per-op backend scheduler counters
 
     // graph external parameters
         bool strict_limit;

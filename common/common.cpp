@@ -395,6 +395,8 @@ void common_ignite_init(llama_context * ctx, common_params & params) {
     ig.prefill_phase       = params.prefill_phase;
     ig.prefill_speed       = params.prefill_speed;
     ig.decode_speed        = params.decode_speed;
+    ig.backend_compute_profile = params.backend_compute_profile;
+    ig.backend_op_breakdown    = params.backend_op_breakdown;
 
     std::strcpy(ig.input_path, params.input_path.c_str());
     std::strcpy(ig.output_dir, params.output_dir.c_str());

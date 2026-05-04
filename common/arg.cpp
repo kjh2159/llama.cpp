@@ -1107,6 +1107,21 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
             params.ignite_verbose = true;
         }
     ).set_examples({LLAMA_EXAMPLE_COMPLETION}));
+    add_opt(common_arg(
+        {"--backend-compute-profile"},
+        "enable backend scheduler compute profiling in ignite CSV output",
+        [](common_params & params) {
+            params.backend_compute_profile = true;
+        }
+    ).set_examples({LLAMA_EXAMPLE_COMPLETION}));
+    add_opt(common_arg(
+        {"--backend-op-breakdown"},
+        "append per-op backend scheduler counters to ignite CSV output",
+        [](common_params & params) {
+            params.backend_compute_profile = true;
+            params.backend_op_breakdown = true;
+        }
+    ).set_examples({LLAMA_EXAMPLE_COMPLETION}));
 
     // ----------------------------------------------------------------------------------------
     add_opt(common_arg(

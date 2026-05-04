@@ -23,6 +23,7 @@ sleep 3
     --top-k 1 \
     --device-name S25 \
     --output-dir output/ \
+    --backend-compute-profile \
     --input-path data/qwen3_prefill_64.json \
     -fa off \
     --strict on \

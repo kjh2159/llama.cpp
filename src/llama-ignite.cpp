@@ -164,6 +164,8 @@ void ignite_params_system_info(const llama_igparams * igparams) {
 
     printf("%s: device name\t\t\t= %s\n\r", __func__, igparams->device_name);
     printf("%s: ignite active status\t\t= %s\n\r", __func__, igparams->is_ignite_active ? "ON" : "OFF");
+    printf("%s: backend compute profile\t= %s\n\r", __func__, igparams->backend_compute_profile ? "ON" : "OFF");
+    printf("%s: backend op breakdown\t\t= %s\n\r", __func__, igparams->backend_op_breakdown ? "ON" : "OFF");
     printf("%s: strict generation\t\t= %s\n\r", __func__, igparams->strict_limit ? "ON" : "OFF");
     printf("%s: enable thinking\t\t= %s\n\r", __func__, igparams->enable_thinking ? "ON" : "OFF");
     printf("%s: prefill CPU/RAM clock idx\t= %d / %d\n\r", __func__, igparams->cpu_clk_idx_p, igparams->ram_clk_idx_p);

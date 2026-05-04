@@ -630,6 +630,8 @@ struct common_params {
     int phase_pause = 0; // ms
     int token_pause = 0; // ms
     int layer_pause = 0; // ms
+    bool backend_compute_profile = false;
+    bool backend_op_breakdown = false;
     int query_interval = 0; // ms
     bool prefill_phase = true; // prefill phase or not
     double prefill_speed = 0.0; // tokens/s

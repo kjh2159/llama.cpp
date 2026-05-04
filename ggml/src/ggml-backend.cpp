@@ -753,6 +753,7 @@ struct ggml_backend_sched {
 static ggml_backend_sched_profile_phase g_sched_profile_phase = GGML_BACKEND_SCHED_PROFILE_PREFILL;
 
 struct ggml_backend_sched_profile_state {
+    bool enabled = false;
     ggml_backend_sched_profile_data out = {};
 
     // Layer-id presence maps (index = layer id). These are used to count
@@ -765,6 +766,10 @@ struct ggml_backend_sched_profile_state {
 };
 
 static ggml_backend_sched_profile_state g_sched_profile;
+
+static bool ggml_sched_profile_enabled(void) {
+    return g_sched_profile.enabled;
+}
 
 // Marks a layer id as seen in the target bucket and increments the unique
 // layer count only on the first observation.
@@ -856,6 +861,10 @@ static int ggml_sched_profile_extract_layer_id(const char * name) {
 // current phase/backend bucket. A layer may appear in both CPU and HTP buckets
 // if execution for that layer is split across backends.
 static void ggml_sched_profile_note_layers(const ggml_cgraph & graph, bool is_cpu) {
+    if (!ggml_sched_profile_enabled()) {
+        return;
+    }
+
     for (int i = 0; i < graph.n_nodes; ++i) {
         const ggml_tensor * t = graph.nodes[i];
         const int layer_id = ggml_sched_profile_extract_layer_id(t ? t->name : nullptr);
@@ -881,6 +890,10 @@ static void ggml_sched_profile_note_layers(const ggml_cgraph & graph, bool is_cp
 
 // Increments per-op counters for the current phase/backend bucket.
 static inline void ggml_sched_profile_add_op_type_count(enum ggml_op op, bool is_cpu) {
+    if (!ggml_sched_profile_enabled()) {
+        return;
+    }
+
     if (op < 0 || op >= GGML_OP_COUNT) {
         return;
     }
@@ -902,12 +915,23 @@ static inline void ggml_sched_profile_add_op_type_count(enum ggml_op op, bool is
 
 // Accumulates ggml op counts for all nodes in the scheduled subgraph.
 static inline void ggml_sched_profile_add_graph_op_type_counts(const ggml_cgraph & graph, bool is_cpu) {
+    if (!ggml_sched_profile_enabled()) {
+        return;
+    }
+
     for (int i = 0; i < graph.n_nodes; ++i) {
         const ggml_tensor * t = graph.nodes[i];
         if (t == nullptr) {
             continue;
         }
         ggml_sched_profile_add_op_type_count(t->op, is_cpu);
+    }
+}
+
+void ggml_backend_sched_profile_set_enabled(bool enabled) {
+    g_sched_profile.enabled = enabled;
+    if (!enabled) {
+        ggml_backend_sched_profile_reset();
     }
 }
 
@@ -921,11 +945,19 @@ void ggml_backend_sched_profile_reset(void) {
 }
 
 void ggml_backend_sched_profile_set_phase(enum ggml_backend_sched_profile_phase phase) {
+    if (!ggml_sched_profile_enabled()) {
+        return;
+    }
+
     g_sched_profile_phase = phase;
 }
 
 // Records host-side wall time spent copying tensors for the current phase.
 static inline void ggml_sched_profile_add_copy_us(const int64_t dt_us) {
+    if (!ggml_sched_profile_enabled()) {
+        return;
+    }
+
     const double dt_ms = (double) dt_us / 1000.0;
     if (g_sched_profile_phase == GGML_BACKEND_SCHED_PROFILE_PREFILL) {
         g_sched_profile.out.prefill_copy_ms += dt_ms;
@@ -936,6 +968,10 @@ static inline void ggml_sched_profile_add_copy_us(const int64_t dt_us) {
 
 // Records host-side wall time spent waiting on backend work for the current phase.
 static inline void ggml_sched_profile_add_wait_us(const int64_t dt_us) {
+    if (!ggml_sched_profile_enabled()) {
+        return;
+    }
+
     const double dt_ms = (double) dt_us / 1000.0;
     if (g_sched_profile_phase == GGML_BACKEND_SCHED_PROFILE_PREFILL) {
         g_sched_profile.out.prefill_wait_ms += dt_ms;
@@ -945,6 +981,10 @@ static inline void ggml_sched_profile_add_wait_us(const int64_t dt_us) {
 }
 
 void ggml_backend_sched_profile_add_build_ms(double build_ms) {
+    if (!ggml_sched_profile_enabled()) {
+        return;
+    }
+
     if (g_sched_profile_phase == GGML_BACKEND_SCHED_PROFILE_PREFILL) {
         g_sched_profile.out.prefill_build_ms += build_ms;
     } else {
@@ -953,6 +993,10 @@ void ggml_backend_sched_profile_add_build_ms(double build_ms) {
 }
 
 void ggml_backend_sched_profile_add_sampling_ms(double sampling_ms) {
+    if (!ggml_sched_profile_enabled()) {
+        return;
+    }
+
     if (g_sched_profile_phase == GGML_BACKEND_SCHED_PROFILE_PREFILL) {
         g_sched_profile.out.prefill_sampling_ms += sampling_ms;
     } else {
@@ -1871,6 +1915,10 @@ static enum ggml_status ggml_backend_sched_compute_splits(ggml_backend_sched_t s
         }
 
         auto prof_add = [&](int n_nodes, int64_t dt_us) {
+            if (!ggml_sched_profile_enabled()) {
+                return;
+            }
+
             const double dt_ms = (double) dt_us / 1000.0;
             g_sched_profile.out.total_ops += (uint64_t) n_nodes;
 
@@ -1896,9 +1944,10 @@ static enum ggml_status ggml_backend_sched_compute_splits(ggml_backend_sched_t s
         };
 
         if (!sched->callback_eval) {
-            const int64_t t0_us = ggml_time_us();
+            const bool profile_enabled = ggml_sched_profile_enabled();
+            const int64_t t0_us = profile_enabled ? ggml_time_us() : 0;
             enum ggml_status ec = ggml_backend_graph_compute_async(split_backend, &split->graph);
-            const int64_t t1_us = ggml_time_us();
+            const int64_t t1_us = profile_enabled ? ggml_time_us() : 0;
             if (ec != GGML_STATUS_SUCCESS) {
                 return ec;
             }
@@ -1922,7 +1971,8 @@ static enum ggml_status ggml_backend_sched_compute_splits(ggml_backend_sched_t s
 
                 struct ggml_cgraph gv = ggml_graph_view(&split->graph, j0, j1 + 1);
 
-                const int64_t t0_us = ggml_time_us();
+                const bool profile_enabled = ggml_sched_profile_enabled();
+                const int64_t t0_us = profile_enabled ? ggml_time_us() : 0;
                 enum ggml_status ec = ggml_backend_graph_compute_async(split_backend, &gv);
                 if (ec != GGML_STATUS_SUCCESS) {
                     return ec;
@@ -1930,7 +1980,7 @@ static enum ggml_status ggml_backend_sched_compute_splits(ggml_backend_sched_t s
 
                 // TODO: pass backend to the callback, then the user can decide if they want to synchronize
                 ggml_backend_synchronize(split_backend);
-                const int64_t t1_us = ggml_time_us();
+                const int64_t t1_us = profile_enabled ? ggml_time_us() : 0;
 
                 prof_add(gv.n_nodes, t1_us - t0_us);
 

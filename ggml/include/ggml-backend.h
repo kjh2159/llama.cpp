@@ -395,6 +395,8 @@ extern "C" {
 
     };
 
+    // Enables/disables process-global backend scheduler profiling.
+    GGML_API void ggml_backend_sched_profile_set_enabled(bool enabled);
     // Clears all accumulated profiling state and resets the active phase to prefill.
     GGML_API void ggml_backend_sched_profile_reset(void);
     // Selects which phase subsequent scheduler/caller-reported metrics are charged to.

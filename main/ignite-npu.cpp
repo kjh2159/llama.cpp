@@ -59,16 +59,22 @@ static bool is_interacting  = false;
 static bool need_insert_eot = false;
 std::atomic_bool sigterm(false);
 
-// Returns true when ignite should append per-op breakdown columns to the
-// profiling CSV. This is an opt-in path controlled by
-// IGNITE_CSV_OP_BREAKDOWN=1|true|TRUE.
-static bool should_write_op_breakdown_csv() {
-    const char * env = std::getenv("IGNITE_CSV_OP_BREAKDOWN");
+static bool env_flag_enabled(const char * name) {
+    const char * env = std::getenv(name);
     if (env == nullptr) {
         return false;
     }
 
     return std::strcmp(env, "1") == 0 || std::strcmp(env, "true") == 0 || std::strcmp(env, "TRUE") == 0;
+}
+
+static bool should_write_backend_profile_csv(const llama_igparams * ig) {
+    return ig != nullptr && ig->backend_compute_profile;
+}
+
+static bool should_write_op_breakdown_csv(const llama_igparams * ig) {
+    return should_write_backend_profile_csv(ig) &&
+        (ig->backend_op_breakdown || env_flag_enabled("IGNITE_CSV_OP_BREAKDOWN"));
 }
 
 // Appends per-op CSV headers for the optional op breakdown section.
@@ -105,7 +111,7 @@ void ctx_kv_cache_clear(struct llama_context * ctx) {
     llama_memory_clear(mem, true);
 }
 
-std::tuple<int, double, int, double> llama_perf_context_print_custom(const struct llama_context * ctx, const std::string & output_filename, std::chrono::time_point<std::chrono::system_clock> start_sys_time) {
+std::tuple<int, double, int, double> llama_perf_context_print_custom(const struct llama_context * ctx, const std::string & output_filename, std::chrono::time_point<std::chrono::system_clock> start_sys_time, const llama_igparams * ig) {
     const auto data = llama_perf_context(ctx);
     const double t_end_ms = 1e-3 * ggml_time_us();
 
@@ -117,44 +123,45 @@ std::tuple<int, double, int, double> llama_perf_context_print_custom(const struc
     // LLAMA_LOG_INFO("%s:       total time = %10.2f ms / %5d tokens\n", __func__, (t_end_ms - data.t_start_ms), (data.n_p_eval + data.n_eval));
 
     // Open the CSV file in append mode.
-    // The fixed columns store aggregate throughput/timing counters. When
-    // IGNITE_CSV_OP_BREAKDOWN is enabled, per-op CPU/HTP counts are appended
-    // after the aggregate profiling fields.
+    // The fixed columns store aggregate throughput/timing counters. Backend
+    // profiling columns are appended only when requested by the ignite options.
 
     // Convert time_point to time_t (seconds since epoch)
     auto now_sys_time = std::chrono::system_clock::now();
     auto sys_time = std::chrono::duration_cast<std::chrono::milliseconds>(now_sys_time-start_sys_time).count();
 
-    const auto prof = ggml_backend_sched_profile_get();
     // system time, prefill speed, decode speed, prefill tokens, decode tokens, ttft
     std::ofstream file(output_filename, std::ios::app);
     if (file.is_open()) {
         file << std::to_string(sys_time) << "," << ( 1e3 / data.t_p_eval_ms *data.n_p_eval ) << "," << (1e3 / data.t_eval_ms * data.n_eval ) << "," 
-              << data.n_p_eval << ","<< data.n_eval << "," << (data.t_p_eval_ms)
-              << "," << prof.prefill_cpu_layers
-              << "," << prof.prefill_htp_layers
-              << "," << prof.prefill_cpu_ms
-              << "," << prof.prefill_htp_ms
-              << "," << prof.decode_cpu_layers
-              << "," << prof.decode_htp_layers
-              << "," << prof.decode_cpu_ms
-              << "," << prof.decode_htp_ms
-              << "," << prof.total_ops
-              << "," << prof.prefill_cpu_ops
-              << "," << prof.decode_cpu_ops
-              << "," << prof.prefill_htp_ops
-              << "," << prof.decode_htp_ops
-              << "," << prof.prefill_copy_ms
-              << "," << prof.prefill_wait_ms
-              << "," << prof.prefill_build_ms
-              << "," << prof.prefill_sampling_ms
-              << "," << prof.decode_copy_ms
-              << "," << prof.decode_wait_ms
-              << "," << prof.decode_build_ms
-              << "," << prof.decode_sampling_ms;
-              if (should_write_op_breakdown_csv()) {
+              << data.n_p_eval << ","<< data.n_eval << "," << (data.t_p_eval_ms);
+        if (should_write_backend_profile_csv(ig)) {
+            const auto prof = ggml_backend_sched_profile_get();
+            file << "," << prof.prefill_cpu_layers
+                 << "," << prof.prefill_htp_layers
+                 << "," << prof.prefill_cpu_ms
+                 << "," << prof.prefill_htp_ms
+                 << "," << prof.decode_cpu_layers
+                 << "," << prof.decode_htp_layers
+                 << "," << prof.decode_cpu_ms
+                 << "," << prof.decode_htp_ms
+                 << "," << prof.total_ops
+                 << "," << prof.prefill_cpu_ops
+                 << "," << prof.decode_cpu_ops
+                 << "," << prof.prefill_htp_ops
+                 << "," << prof.decode_htp_ops
+                 << "," << prof.prefill_copy_ms
+                 << "," << prof.prefill_wait_ms
+                 << "," << prof.prefill_build_ms
+                 << "," << prof.prefill_sampling_ms
+                 << "," << prof.decode_copy_ms
+                 << "," << prof.decode_wait_ms
+                 << "," << prof.decode_build_ms
+                 << "," << prof.decode_sampling_ms;
+            if (should_write_op_breakdown_csv(ig)) {
                 append_profile_csv_op_values(file, prof);
             }
+        }
         file << "\n";
         file.close();
     } else {
@@ -315,6 +322,11 @@ int main(int argc, char ** argv) {
     if (ig == nullptr) {
         LOG_ERR("%s: failed to get ignite params\n", __func__);
         return 1;
+    }
+    if (env_flag_enabled("IGNITE_CSV_OP_BREAKDOWN")) {
+        ig->backend_compute_profile = true;
+        ig->backend_op_breakdown = true;
+        ggml_backend_sched_profile_set_enabled(true);
     }
 
     llama_memory_t mem = llama_get_memory(ctx);
@@ -603,14 +615,16 @@ int main(int argc, char ** argv) {
     auto start_sys_time = std::chrono::system_clock::now();
     std::ofstream file(output_path_infer, std::ios::app);
     if (file.is_open() && output_path_infer!="/inference_stats.csv") {
-        file << "sys_time,prefill_speed,decode_speed,prefill_token,decode_token,ttft,";
-        file << "prefill_cpu_layers,prefill_htp_layers,prefill_cpu_ms,prefill_htp_ms,";
-        file << "decode_cpu_layers,decode_htp_layers,decode_cpu_ms,decode_htp_ms,";
-        file << "total_ops,prefill_cpu_ops,decode_cpu_ops,prefill_htp_ops,decode_htp_ops,";
-        file << "prefill_copy_ms,prefill_wait_ms,prefill_build_ms,prefill_sampling_ms,";
-        file << "decode_copy_ms,decode_wait_ms,decode_build_ms,decode_sampling_ms";
-        if (should_write_op_breakdown_csv()) {
-            append_profile_csv_op_headers(file);
+        file << "sys_time,prefill_speed,decode_speed,prefill_token,decode_token,ttft";
+        if (should_write_backend_profile_csv(ig)) {
+            file << ",prefill_cpu_layers,prefill_htp_layers,prefill_cpu_ms,prefill_htp_ms";
+            file << ",decode_cpu_layers,decode_htp_layers,decode_cpu_ms,decode_htp_ms";
+            file << ",total_ops,prefill_cpu_ops,decode_cpu_ops,prefill_htp_ops,decode_htp_ops";
+            file << ",prefill_copy_ms,prefill_wait_ms,prefill_build_ms,prefill_sampling_ms";
+            file << ",decode_copy_ms,decode_wait_ms,decode_build_ms,decode_sampling_ms";
+            if (should_write_op_breakdown_csv(ig)) {
+                append_profile_csv_op_headers(file);
+            }
         }
         file << "\n";
         file.close();
@@ -1009,11 +1023,13 @@ int main(int argc, char ** argv) {
                 LOG_DBG("saved session to %s\n", path_session.c_str());
             }
 
-            const int64_t t_sample_us = ggml_time_us();
+            const int64_t t_sample_us = ig->backend_compute_profile ? ggml_time_us() : 0;
             const llama_token id = common_sampler_sample(smpl, ctx, -1);
 
             common_sampler_accept(smpl, id, /* accept_grammar= */ true);
-            ggml_backend_sched_profile_add_sampling_ms((ggml_time_us() - t_sample_us) / 1000.0);
+            if (ig->backend_compute_profile) {
+                ggml_backend_sched_profile_add_sampling_ms((ggml_time_us() - t_sample_us) / 1000.0);
+            }
 
             // LOG_DBG("last: %s\n", string_from(ctx, smpl->prev.to_vector()).c_str());
 
@@ -1162,7 +1178,7 @@ int main(int argc, char ** argv) {
                     // LOG_INF("Inference time for previous question: %lld ms\n", inference_duration);
                     common_perf_print(ctx, smpl);
                     if(output_path_infer!="/inference_stats.csv"){ // deprecated in future
-                        llama_perf_context_print_custom(ctx, output_path_infer, start_sys_time);
+                        llama_perf_context_print_custom(ctx, output_path_infer, start_sys_time, ig);
                     }
                     //check_hardware(device_name);
                     // common_sampler_free(smpl);
@@ -1214,7 +1230,9 @@ int main(int argc, char ** argv) {
                     ctx_kv_cache_clear(ctx);
                     embd_inp.clear();
                     llama_perf_context_reset(ctx);
-                    ggml_backend_sched_profile_reset();
+                    if (ig->backend_compute_profile) {
+                        ggml_backend_sched_profile_reset();
+                    }
                     n_past = 0; n_consumed = 0; waiting_for_first_input = true;
                     common_sampler_reset(smpl);
 
