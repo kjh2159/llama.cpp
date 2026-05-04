@@ -959,13 +959,6 @@ void ggml_backend_sched_profile_add_sampling_ms(double sampling_ms) {
         g_sched_profile.out.decode_sampling_ms += sampling_ms;
     }
 }
-void ggml_backend_sched_profile_add_proc_cpu_ms(double proc_cpu_ms) {
-    if (g_sched_profile_phase == GGML_BACKEND_SCHED_PROFILE_PREFILL) {
-        g_sched_profile.out.prefill_proc_cpu_ms += proc_cpu_ms;
-    } else {
-        g_sched_profile.out.decode_proc_cpu_ms += proc_cpu_ms;
-    }
-}
 
 struct ggml_backend_sched_profile_data ggml_backend_sched_profile_get(void) {
     return g_sched_profile.out;

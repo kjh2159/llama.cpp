@@ -249,6 +249,9 @@ set_target_properties(llama
         PUBLIC_HEADER "${LLAMA_PUBLIC_HEADERS}")
 
 install(TARGETS llama LIBRARY PUBLIC_HEADER)
+# llama-ignite-npu links against dvfs at runtime, so package installs need to
+# ship the library alongside the rest of the shared objects.
+install(TARGETS dvfs LIBRARY RUNTIME ARCHIVE)
 
 configure_package_config_file(
         ${CMAKE_CURRENT_SOURCE_DIR}/cmake/llama-config.cmake.in

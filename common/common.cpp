@@ -374,6 +374,44 @@ void common_init() {
     LOG_INF("build: %d (%s) with %s for %s%s\n", LLAMA_BUILD_NUMBER, LLAMA_COMMIT, LLAMA_COMPILER, LLAMA_BUILD_TARGET, build_type);
 }
 
+void common_ignite_init(llama_context * ctx, common_params & params) {
+    if (!ctx) {
+        return;
+    }
+
+    llama_igparams ig{};
+
+    llama_ignite_set_active(ctx, params.is_ignite_active);
+    llama_ignite_set_layer_pause(ctx, params.layer_pause);
+
+    ig.max_query_number    = params.max_query_number;
+    ig.strict_limit        = params.strict_limit;
+    ig.strict_limit_length = params.strict_limit_length;
+    ig.enable_thinking     = params.enable_thinking;
+    ig.layer_pause         = params.layer_pause;
+    ig.phase_pause         = params.phase_pause;
+    ig.token_pause         = params.token_pause;
+    ig.query_interval      = params.query_interval;
+    ig.prefill_phase       = params.prefill_phase;
+    ig.prefill_speed       = params.prefill_speed;
+    ig.decode_speed        = params.decode_speed;
+
+    std::strcpy(ig.input_path, params.input_path.c_str());
+    std::strcpy(ig.output_dir, params.output_dir.c_str());
+    std::strcpy(ig.output_path_hard, params.output_path_hard.c_str());
+    std::strcpy(ig.output_path_infer, params.output_path_infer.c_str());
+
+    std::strcpy(ig.device_name, params.device_name.c_str());
+    ig.is_ignite_active = params.is_ignite_active;
+    ig.ignite_verbose   = params.ignite_verbose;
+    ig.cpu_clk_idx_p    = params.cpu_clk_idx_p;
+    ig.ram_clk_idx_p    = params.ram_clk_idx_p;
+    ig.cpu_clk_idx_d    = params.cpu_clk_idx_d;
+    ig.ram_clk_idx_d    = params.ram_clk_idx_d;
+
+    init_ignite_params(ctx, &ig);
+}
+
 std::string common_params_get_system_info(const common_params & params) {
     std::ostringstream os;
 
@@ -1225,6 +1263,7 @@ common_init_result_ptr common_init_from_params(common_params & params) {
         LOG_ERR("%s: failed to create context with model '%s'\n", __func__, params.model.path.c_str());
         return res;
     }
+    common_ignite_init(lctx, params);
 
     const llama_vocab * vocab = llama_model_get_vocab(model);
 

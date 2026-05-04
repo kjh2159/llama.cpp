@@ -4,6 +4,7 @@
 #include "llama-cparams.h"
 #include "llama-graph.h"
 #include "llama-adapter.h"
+#include "llama-ignite.h"
 
 #include "ggml-cpp.h"
 #include "ggml-opt.h"
@@ -107,6 +108,11 @@ struct llama_context {
     void set_adapter_lora(
             llama_adapter_lora * adapter,
             float scale);
+
+    void set_ignite_params(
+            const llama_igparams * cfg);
+
+    struct llama_igparams * get_ignite_params();
 
     bool rm_adapter_lora(
             llama_adapter_lora * adapter);
@@ -228,6 +234,8 @@ public:
 
     // can reuse the llm_graph_result instance of the context (for example to update a memory module)
     llm_graph_result * get_gf_res_reserve() const;
+
+    static bool lp_eval_callback(struct ggml_tensor * t, bool ask, void * user_data);
 
     // returns the result of ggml_backend_sched_graph_compute_async execution
     ggml_status graph_compute(ggml_cgraph * gf, bool batched);
@@ -367,4 +375,14 @@ private:
     mutable int32_t n_eval   = 0; // number of eval calls
 
     mutable int32_t n_reused = 0; // number of times the previous graph was reused
+
+    llama_igparams igparams = {};
+
+private:
+    enum class lp_mha_key_t { none, attn_out, kqv_out };
+    bool lp_enable = false;
+    bool lp_is_prefill = false;
+    mutable bool seen_attn_out = false;
+    mutable bool seen_kqv_out = false;
+    mutable lp_mha_key_t lp_mha_key = lp_mha_key_t::none;
 };

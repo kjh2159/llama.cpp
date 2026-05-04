@@ -19,6 +19,7 @@ add_library(llama
             llama-graph.cpp
             llama-hparams.cpp
             llama-impl.cpp
+            llama-ignite.cpp
             llama-io.cpp
             llama-kv-cache.cpp
             llama-kv-cache-iswa.cpp
@@ -36,6 +37,8 @@ add_library(llama
             unicode-data.cpp
             unicode.cpp
             unicode.h
+            hard/utils.cpp
+            hard/utils.h
             models/afmoe.cpp
             models/apertus.cpp
             models/arcee.cpp
@@ -164,6 +167,7 @@ set_target_properties(llama PROPERTIES
 # llama library
 target_include_directories(llama PRIVATE .)
 target_include_directories(llama PUBLIC ../include)
+target_include_directories(llama PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/../vendor")
 target_compile_features   (llama PRIVATE cxx_std_17) # don't bump
 target_link_libraries(llama PUBLIC ggml)
 

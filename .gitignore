@@ -140,3 +140,5 @@ poetry.toml
 /.windsurf/
 # emscripten
 a.out.*
+
+pkg-adb/

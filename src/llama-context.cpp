@@ -8,11 +8,14 @@
 #include "llama-mmap.h"
 #include "llama-model.h"
 
+#include <chrono>
 #include <cinttypes>
 #include <cmath>
 #include <cstring>
+#include <iostream>
 #include <limits>
 #include <stdexcept>
+#include <thread>
 
 //
 // llama_context
@@ -1073,6 +1076,17 @@ void llama_context::set_adapter_lora(
     sched_need_reserve = true;
 }
 
+void llama_context::set_ignite_params(
+            const llama_igparams * cfg) {
+    LLAMA_LOG_DEBUG("%s: call\n", __func__);
+    igparams = *cfg;
+    lp_enable = igparams.layer_pause > 0;
+}
+
+struct llama_igparams * llama_context::get_ignite_params() {
+    return &igparams;
+}
+
 bool llama_context::rm_adapter_lora(
             llama_adapter_lora * adapter) {
     LLAMA_LOG_DEBUG("%s: adapter = %p\n", __func__, (void *) adapter);
@@ -1121,12 +1135,21 @@ llm_graph_result * llama_context::process_ubatch(const llama_ubatch & ubatch, ll
         return nullptr;
     }
 
+    lp_is_prefill = (ubatch.n_tokens > 1);
+
     auto * res = gf_res_prev.get();
     auto * gf  = res->get_gf();
 
     // the new graph parameters
     // in order to correctly reuse a graph, it's full topology has to be uniquely determined by these parameters
     const auto gparams = graph_params(res, ubatch, mctx, gtype);
+    if (seen_attn_out) {
+        lp_mha_key = lp_mha_key_t::attn_out;
+    } else if (seen_kqv_out) {
+        lp_mha_key = lp_mha_key_t::kqv_out;
+    } else {
+        lp_mha_key = lp_mha_key_t::none;
+    }
 
     if (!graph_reuse_disable && res->can_reuse(gparams)) {
         //LLAMA_LOG_DEBUG("%s: reusing previous graph\n", __func__);
@@ -2134,6 +2157,12 @@ ggml_status llama_context::graph_compute(
         set_n_threads_fn.second(set_n_threads_fn.first, n_threads);
     }
 
+    if (igparams.is_ignite_active && lp_enable && batched) {
+        ggml_backend_sched_set_eval_callback(sched.get(), lp_eval_callback, this);
+    } else {
+        ggml_backend_sched_set_eval_callback(sched.get(), nullptr, nullptr);
+    }
+
     // Let ggml scheduler profiling know whether this run is prefill (batched) or decode (single token).
     ggml_backend_sched_profile_set_phase(batched ? GGML_BACKEND_SCHED_PROFILE_PREFILL : GGML_BACKEND_SCHED_PROFILE_DECODE);
 
@@ -2147,12 +2176,63 @@ ggml_status llama_context::graph_compute(
     return status;
 }
 
+bool llama_context::lp_eval_callback(struct ggml_tensor * t, bool ask, void * user_data) {
+    auto * ctx = static_cast<llama_context *>(user_data);
+
+    if (!ctx->lp_enable || !ctx->lp_is_prefill) {
+        return ask ? false : true;
+    }
+
+    const char * n = ggml_get_name(t);
+    if (!n || !n[0]) {
+        return ask ? false : true;
+    }
+
+    const bool is_mha =
+        (strncmp(n, "attn_out", 8) == 0 && ctx->lp_mha_key == lp_mha_key_t::attn_out) ||
+        (strncmp(n, "kqv_out", 7) == 0 && ctx->lp_mha_key == lp_mha_key_t::kqv_out);
+    const bool is_ffn =
+        (strncmp(n, "ffn_out", 7) == 0 || strncmp(n, "ffn_mlp", 7) == 0);
+
+    if (ask) {
+        return is_mha || is_ffn;
+    }
+
+    if (strncmp(n, "attn_out", 8) == 0 && ctx->lp_mha_key == lp_mha_key_t::attn_out) {
+        if (ctx->igparams.ignite_verbose) {
+            std::cout << std::flush << "<mha:" << ctx->igparams.layer_pause << ">";
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(ctx->igparams.layer_pause));
+    } else if (strncmp(n, "kqv_out", 7) == 0 && ctx->lp_mha_key == lp_mha_key_t::kqv_out) {
+        if (ctx->igparams.ignite_verbose) {
+            std::cout << std::flush << "<kqv:" << ctx->igparams.layer_pause << ">";
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(ctx->igparams.layer_pause));
+    }
+
+    if (strncmp(n, "ffn_out", 7) == 0 || strncmp(n, "ffn_mlp", 7) == 0) {
+        if (ctx->igparams.ignite_verbose) {
+            std::cout << std::flush << "<ffn:" << ctx->igparams.layer_pause << ">";
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(ctx->igparams.layer_pause));
+    }
+
+    return is_mha || is_ffn;
+}
+
 llm_graph_cb llama_context::graph_get_cb() const {
     return [&](const llama_ubatch & ubatch, ggml_tensor * cur, const char * name, int il) {
         if (il >= 0) {
             ggml_format_name(cur, "%s-%d", name, il);
         } else {
             ggml_set_name(cur, name);
+        }
+
+        if (strcmp(name, "attn_out") == 0) {
+            seen_attn_out = true;
+        }
+        if (strcmp(name, "kqv_out") == 0) {
+            seen_kqv_out = true;
         }
 
         // norm may be automatically assigned to the backend of the previous layer, increasing data transfer between backends
