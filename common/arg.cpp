@@ -1039,7 +1039,91 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
         [](common_params & params, int value) {
             params.max_query_number = value;
         }
-    ).set_examples({LLAMA_EXAMPLE_SERVER}));
+    ).set_examples({LLAMA_EXAMPLE_COMPLETION}));
+
+    // ----------------------------------------------------------------------------------------
+    // 20260406 IGNITE DVFS
+    // ----------------------------------------------------------------------------------------
+    add_opt(common_arg(
+        {"--device-name", "--dvfs-device"}, "DN",
+        "DVFS target device name (e.g. S25, S24, Pixel9)",
+        [](common_params & params, const std::string & value) {
+            params.device_name = value;
+        }
+    ).set_examples({LLAMA_EXAMPLE_COMPLETION}));
+    add_opt(common_arg(
+        {"--cpu-p"}, "IDX",
+        "prefill CPU DVFS index",
+        [](common_params & params, int value) {
+            params.cpu_clk_idx_p = value;
+        }
+    ).set_examples({LLAMA_EXAMPLE_COMPLETION}));
+    add_opt(common_arg(
+        {"--ram-p"}, "IDX",
+        "prefill RAM DVFS index",
+        [](common_params & params, int value) {
+            params.ram_clk_idx_p = value;
+        }
+    ).set_examples({LLAMA_EXAMPLE_COMPLETION}));
+    add_opt(common_arg(
+        {"--cpu-d"}, "IDX",
+        "decode CPU DVFS index",
+        [](common_params & params, int value) {
+            params.cpu_clk_idx_d = value;
+        }
+    ).set_examples({LLAMA_EXAMPLE_COMPLETION}));
+    add_opt(common_arg(
+        {"--ram-d"}, "IDX",
+        "decode RAM DVFS index",
+        [](common_params & params, int value) {
+            params.ram_clk_idx_d = value;
+        }
+    ).set_examples({LLAMA_EXAMPLE_COMPLETION}));
+    add_opt(common_arg(
+        {"--phase-pause"}, "MS",
+        "pause time between prefill and decode phases in milliseconds",
+        [](common_params & params, int value) {
+            params.phase_pause = value;
+        }
+    ).set_examples({LLAMA_EXAMPLE_COMPLETION}));
+    add_opt(common_arg(
+        {"--token-pause"}, "MS",
+        "pause time between generated decode tokens in milliseconds",
+        [](common_params & params, int value) {
+            params.token_pause = value;
+        }
+    ).set_examples({LLAMA_EXAMPLE_COMPLETION}));
+    add_opt(common_arg(
+        {"--layer-pause"}, "MS",
+        "pause time for layer-wise experiments in milliseconds",
+        [](common_params & params, int value) {
+            params.layer_pause = value;
+        }
+    ).set_examples({LLAMA_EXAMPLE_COMPLETION}));
+    add_opt(common_arg(
+        {"--ignite-verbose"},
+        "enable verbose ignite markers for layer pause debugging",
+        [](common_params & params) {
+            params.ignite_verbose = true;
+        }
+    ).set_examples({LLAMA_EXAMPLE_COMPLETION}));
+    add_opt(common_arg(
+        {"--backend-compute-profile"},
+        "enable backend scheduler compute profiling in ignite CSV output",
+        [](common_params & params) {
+            params.backend_compute_profile = true;
+        }
+    ).set_examples({LLAMA_EXAMPLE_COMPLETION}));
+    add_opt(common_arg(
+        {"--backend-op-breakdown"},
+        "append per-op backend scheduler counters to ignite CSV output",
+        [](common_params & params) {
+            params.backend_compute_profile = true;
+            params.backend_op_breakdown = true;
+        }
+    ).set_examples({LLAMA_EXAMPLE_COMPLETION}));
+
+    // ----------------------------------------------------------------------------------------
     add_opt(common_arg(
         {"--strict"}, "ST",
         "enable strict mode",

@@ -109,6 +109,7 @@ option(LLAMA_BUILD_TOOLS    "llama: build tools"          ${LLAMA_STANDALONE})
 option(LLAMA_BUILD_EXAMPLES "llama: build examples"       ${LLAMA_STANDALONE})
 option(LLAMA_BUILD_SERVER   "llama: build server example" ${LLAMA_STANDALONE})
 option(LLAMA_TOOLS_INSTALL  "llama: install tools"        ${LLAMA_TOOLS_INSTALL_DEFAULT})
+option(IGNITE_USE_SYSTEM_DVFS "Use system DVFS library" ON)
 
 # 3rd party libs
 option(LLAMA_HTTPLIB    "llama: httplib for downloading functionality" ON)
@@ -248,6 +249,9 @@ set_target_properties(llama
         PUBLIC_HEADER "${LLAMA_PUBLIC_HEADERS}")
 
 install(TARGETS llama LIBRARY PUBLIC_HEADER)
+# llama-ignite-npu links against dvfs at runtime, so package installs need to
+# ship the library alongside the rest of the shared objects.
+install(TARGETS dvfs LIBRARY RUNTIME ARCHIVE)
 
 configure_package_config_file(
         ${CMAKE_CURRENT_SOURCE_DIR}/cmake/llama-config.cmake.in

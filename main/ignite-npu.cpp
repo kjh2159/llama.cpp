@@ -6,14 +6,19 @@
 #include "llama.h"
 #include "chat.h"
 
+#include "ggml-backend.h"
+
 #include <cstdio>
 #include <cstring>
 #include <ctime>
+#include <cstdint>
+#include <time.h>
 #include <fstream>
 #include <iostream>
 #include <sstream>
 #include <string>
 #include <vector>
+#include <thread>
 #include <tuple>  // to accumulate json
 
 #if defined (__unix__) || (defined (__APPLE__) && defined (__MACH__))
@@ -34,6 +39,13 @@
 
 #include "nlohmann/json.hpp"
 
+
+// dvfs library
+#include "hard/record.h"
+#include "hard/dvfs.h"
+#include "hard/utils.h"
+#include "hard/affinity.h"
+
 using json = nlohmann::json;
 
 static llama_context           ** g_ctx;
@@ -45,6 +57,53 @@ static std::ostringstream       * g_output_ss;
 static std::vector<llama_token> * g_output_tokens;
 static bool is_interacting  = false;
 static bool need_insert_eot = false;
+std::atomic_bool sigterm(false);
+
+static bool env_flag_enabled(const char * name) {
+    const char * env = std::getenv(name);
+    if (env == nullptr) {
+        return false;
+    }
+
+    return std::strcmp(env, "1") == 0 || std::strcmp(env, "true") == 0 || std::strcmp(env, "TRUE") == 0;
+}
+
+static bool should_write_backend_profile_csv(const llama_igparams * ig) {
+    return ig != nullptr && ig->backend_compute_profile;
+}
+
+static bool should_write_op_breakdown_csv(const llama_igparams * ig) {
+    return should_write_backend_profile_csv(ig) &&
+        (ig->backend_op_breakdown || env_flag_enabled("IGNITE_CSV_OP_BREAKDOWN"));
+}
+
+// Appends per-op CSV headers for the optional op breakdown section.
+// Each ggml op contributes four columns:
+// prefill_cpu, decode_cpu, prefill_htp, decode_htp.
+// TODO: move to utils if this CSV formatting is reused outside ignite-npu.
+static void append_profile_csv_op_headers(std::ostream & os) {
+    for (int op = 0; op < GGML_OP_COUNT; ++op) {
+        const char * op_name = ggml_op_name((ggml_op) op);
+        if (op_name == nullptr || op_name[0] == '\0') {
+            op_name = "unknown";
+        }
+        os << ",prefill_cpu_op_" << op_name
+           << ",decode_cpu_op_" << op_name
+           << ",prefill_htp_op_" << op_name
+           << ",decode_htp_op_" << op_name;
+    }
+}
+
+// Appends per-op CSV values matching append_profile_csv_op_headers().
+// TODO: move to utils if this CSV formatting is reused outside ignite-npu.
+static void append_profile_csv_op_values(std::ostream & os, const ggml_backend_sched_profile_data & prof) {
+    for (int op = 0; op < GGML_OP_COUNT; ++op) {
+        os << "," << prof.prefill_cpu_ops_by_type[op]
+           << "," << prof.decode_cpu_ops_by_type[op]
+           << "," << prof.prefill_htp_ops_by_type[op]
+           << "," << prof.decode_htp_ops_by_type[op];
+    }
+}
 
 void ctx_kv_cache_clear(struct llama_context * ctx) {
     //llama_kv_cache_clear(ctx); //deprecated
@@ -52,7 +111,7 @@ void ctx_kv_cache_clear(struct llama_context * ctx) {
     llama_memory_clear(mem, true);
 }
 
-std::tuple<int, double, int, double> llama_perf_context_print_custom(const struct llama_context * ctx, const std::string & output_filename, std::chrono::time_point<std::chrono::system_clock> start_sys_time) {
+std::tuple<int, double, int, double> llama_perf_context_print_custom(const struct llama_context * ctx, const std::string & output_filename, std::chrono::time_point<std::chrono::system_clock> start_sys_time, const llama_igparams * ig) {
     const auto data = llama_perf_context(ctx);
     const double t_end_ms = 1e-3 * ggml_time_us();
 
@@ -63,17 +122,47 @@ std::tuple<int, double, int, double> llama_perf_context_print_custom(const struc
     //         __func__, data.t_eval_ms, data.n_eval, data.t_eval_ms / data.n_eval, 1e3 / data.t_eval_ms * data.n_eval);
     // LLAMA_LOG_INFO("%s:       total time = %10.2f ms / %5d tokens\n", __func__, (t_end_ms - data.t_start_ms), (data.n_p_eval + data.n_eval));
 
-    // Open the CSV file in append mode
-    
-    
+    // Open the CSV file in append mode.
+    // The fixed columns store aggregate throughput/timing counters. Backend
+    // profiling columns are appended only when requested by the ignite options.
+
     // Convert time_point to time_t (seconds since epoch)
     auto now_sys_time = std::chrono::system_clock::now();
     auto sys_time = std::chrono::duration_cast<std::chrono::milliseconds>(now_sys_time-start_sys_time).count();
+
     // system time, prefill speed, decode speed, prefill tokens, decode tokens, ttft
     std::ofstream file(output_filename, std::ios::app);
     if (file.is_open()) {
         file << std::to_string(sys_time) << "," << ( 1e3 / data.t_p_eval_ms *data.n_p_eval ) << "," << (1e3 / data.t_eval_ms * data.n_eval ) << "," 
-              << data.n_p_eval << ","<< data.n_eval << "," << (data.t_p_eval_ms)<<"\n";
+              << data.n_p_eval << ","<< data.n_eval << "," << (data.t_p_eval_ms);
+        if (should_write_backend_profile_csv(ig)) {
+            const auto prof = ggml_backend_sched_profile_get();
+            file << "," << prof.prefill_cpu_layers
+                 << "," << prof.prefill_htp_layers
+                 << "," << prof.prefill_cpu_ms
+                 << "," << prof.prefill_htp_ms
+                 << "," << prof.decode_cpu_layers
+                 << "," << prof.decode_htp_layers
+                 << "," << prof.decode_cpu_ms
+                 << "," << prof.decode_htp_ms
+                 << "," << prof.total_ops
+                 << "," << prof.prefill_cpu_ops
+                 << "," << prof.decode_cpu_ops
+                 << "," << prof.prefill_htp_ops
+                 << "," << prof.decode_htp_ops
+                 << "," << prof.prefill_copy_ms
+                 << "," << prof.prefill_wait_ms
+                 << "," << prof.prefill_build_ms
+                 << "," << prof.prefill_sampling_ms
+                 << "," << prof.decode_copy_ms
+                 << "," << prof.decode_wait_ms
+                 << "," << prof.decode_build_ms
+                 << "," << prof.decode_sampling_ms;
+            if (should_write_op_breakdown_csv(ig)) {
+                append_profile_csv_op_values(file, prof);
+            }
+        }
+        file << "\n";
         file.close();
     } else {
         // LLAMA_LOG_INFO("Failed to open file: %s\n", output_filename.c_str());
@@ -227,6 +316,17 @@ int main(int argc, char ** argv) {
     if (ctx == NULL) {
         LOG_ERR("%s: error: unable to create context\n", __func__);
         return 1;
+    }
+
+    auto * ig = get_ignite_params(ctx);
+    if (ig == nullptr) {
+        LOG_ERR("%s: failed to get ignite params\n", __func__);
+        return 1;
+    }
+    if (env_flag_enabled("IGNITE_CSV_OP_BREAKDOWN")) {
+        ig->backend_compute_profile = true;
+        ig->backend_op_breakdown = true;
+        ggml_backend_sched_profile_set_enabled(true);
     }
 
     llama_memory_t mem = llama_get_memory(ctx);
@@ -515,9 +615,71 @@ int main(int argc, char ** argv) {
     auto start_sys_time = std::chrono::system_clock::now();
     std::ofstream file(output_path_infer, std::ios::app);
     if (file.is_open() && output_path_infer!="/inference_stats.csv") {
-        file << "sys_time, prefill_speed, decode_speed, prefill_token, decode_token, ttft\n";
+        file << "sys_time,prefill_speed,decode_speed,prefill_token,decode_token,ttft";
+        if (should_write_backend_profile_csv(ig)) {
+            file << ",prefill_cpu_layers,prefill_htp_layers,prefill_cpu_ms,prefill_htp_ms";
+            file << ",decode_cpu_layers,decode_htp_layers,decode_cpu_ms,decode_htp_ms";
+            file << ",total_ops,prefill_cpu_ops,decode_cpu_ops,prefill_htp_ops,decode_htp_ops";
+            file << ",prefill_copy_ms,prefill_wait_ms,prefill_build_ms,prefill_sampling_ms";
+            file << ",decode_copy_ms,decode_wait_ms,decode_build_ms,decode_sampling_ms";
+            if (should_write_op_breakdown_csv(ig)) {
+                append_profile_csv_op_headers(file);
+            }
+        }
+        file << "\n";
         file.close();
     }
+
+    // dummy dvfs object
+    const std::string device_name =
+        std::strlen(ig->device_name) > 0 ? ig->device_name : "S25";
+
+    DVFS dvfs(device_name);
+    dvfs.control_start_point = start_sys_time;
+    dvfs.output_filename = params.output_dir + "/hardware_stats.csv";
+
+    const bool want_prefill_dvfs = ig->cpu_clk_idx_p >= 0 || ig->ram_clk_idx_p >= 0;
+    const bool want_decode_dvfs  = ig->cpu_clk_idx_d >= 0 || ig->ram_clk_idx_d >= 0;
+    bool runtime_dvfs_ready = false;
+
+    if (want_prefill_dvfs || want_decode_dvfs) {
+        runtime_dvfs_ready = (dvfs.init_fd_cache() == 0);
+        if (!runtime_dvfs_ready) {
+            LOG_WRN("%s: failed to init DVFS for %s, continuing without runtime DVFS\n",
+                    __func__, device_name.c_str());
+        }
+    }
+
+    auto apply_dvfs = [&](int cpu_idx, int ram_idx) {
+        if (!runtime_dvfs_ready) {
+            return;
+        }
+
+        if (cpu_idx >= 0) {
+            auto conf = dvfs.get_cpu_freqs_conf(cpu_idx);
+            if (dvfs.set_cpu_freq(conf) != 0) {
+                LOG_WRN("%s: failed to set CPU DVFS index %d\n", __func__, cpu_idx);
+            }
+        }
+
+        if (ram_idx >= 0) {
+            if (dvfs.set_ram_freq(ram_idx) != 0) {
+                LOG_WRN("%s: failed to set RAM DVFS index %d\n", __func__, ram_idx);
+            }
+        }
+    };
+
+    auto reset_dvfs = [&]() {
+        if (!runtime_dvfs_ready) {
+            return;
+        }
+        dvfs.unset_cpu_freq();
+        dvfs.unset_ram_freq();
+    };
+
+    #if IGNITE_USE_SYSTEM_DVFS
+    std::thread record_thread = std::thread(record_hard, std::ref(sigterm), std::ref(dvfs));
+    #endif
 
     // Input json file instead of cli input
     std::vector<std::string> json_questions;
@@ -530,7 +692,7 @@ int main(int argc, char ** argv) {
         // }
     }
     bool custom_max_query = params.max_query_number == -1 ? false : true;
-    unsigned int max_query_num = custom_max_query ? params.max_query_number : json_questions.size();
+    size_t max_query_num = custom_max_query ? (size_t) params.max_query_number : json_questions.size();
     // JSON questions load done
 //------------------------------------------------
 
@@ -792,10 +954,32 @@ int main(int argc, char ** argv) {
             }
 
             if (!embd.empty()) {
+                // prefill/decode detector
+                if (!generation_started) {
+                    // prefill phase
+                    if (!prefill_active && ig->is_ignite_active) {
+                        apply_dvfs(ig->cpu_clk_idx_p, ig->ram_clk_idx_p);
+                    }
+                    if (!prefill_active) {
+                        prefill_active = true;
+                        decode_active = false;
+                    }
+                } else {
+                    // decode phase
+                    if (!decode_active && ig->is_ignite_active) {
+                        apply_dvfs(ig->cpu_clk_idx_d, ig->ram_clk_idx_d);
+                    }
+                    if (!decode_active) {
+                        prefill_active = false;
+                        decode_active = true;
+                    }
+                }
                 int n_eval = (int) embd.size();
+
                 LOG_DBG("eval: %s\n", string_from(ctx, embd).c_str());
 
                 GGML_ASSERT(n_eval <= params.n_batch);
+
                 if (llama_decode(ctx, llama_batch_get_one(embd.data(), n_eval))) {
                     LOG_ERR("%s : failed to eval\n", __func__);
                     return 1;
@@ -819,6 +1003,13 @@ int main(int argc, char ** argv) {
         embd.clear();
 
         if ((int) embd_inp.size() <= n_consumed && !is_interacting) {
+            if (!generation_started) {
+                if (ig->phase_pause > 0) {
+                    std::this_thread::sleep_for(
+                        std::chrono::milliseconds(ig->phase_pause));
+                }
+            }
+
 // ------------------------------------------------
             // now, generation starts
             generation_started = true;
@@ -832,9 +1023,13 @@ int main(int argc, char ** argv) {
                 LOG_DBG("saved session to %s\n", path_session.c_str());
             }
 
+            const int64_t t_sample_us = ig->backend_compute_profile ? ggml_time_us() : 0;
             const llama_token id = common_sampler_sample(smpl, ctx, -1);
 
             common_sampler_accept(smpl, id, /* accept_grammar= */ true);
+            if (ig->backend_compute_profile) {
+                ggml_backend_sched_profile_add_sampling_ms((ggml_time_us() - t_sample_us) / 1000.0);
+            }
 
             // LOG_DBG("last: %s\n", string_from(ctx, smpl->prev.to_vector()).c_str());
 
@@ -983,7 +1178,7 @@ int main(int argc, char ** argv) {
                     // LOG_INF("Inference time for previous question: %lld ms\n", inference_duration);
                     common_perf_print(ctx, smpl);
                     if(output_path_infer!="/inference_stats.csv"){ // deprecated in future
-                        llama_perf_context_print_custom(ctx, output_path_infer, start_sys_time);
+                        llama_perf_context_print_custom(ctx, output_path_infer, start_sys_time, ig);
                     }
                     //check_hardware(device_name);
                     // common_sampler_free(smpl);
@@ -1030,24 +1225,31 @@ int main(int argc, char ** argv) {
                     buffer = "/no_think "; // see `general.architecture`
                     auto tmp = json_questions[current_question_index-1]; // only json requires -1
                     buffer += tmp;
-                    
+
                     // context reset for new question
                     ctx_kv_cache_clear(ctx);
                     embd_inp.clear();
                     llama_perf_context_reset(ctx);
+                    if (ig->backend_compute_profile) {
+                        ggml_backend_sched_profile_reset();
+                    }
                     n_past = 0; n_consumed = 0; waiting_for_first_input = true;
                     common_sampler_reset(smpl);
 
+                    // reset dvfs will be not called after query finished
+                    prefill_active = false;
+                    decode_active = false;
                     generation_started = false;
+
                     n_remain = params.n_predict;
                     ga_i = 0;
                     is_antiprompt = false;
-                    
+
                     // logger info
                     LOG_INF("[%zu/%zu] ", current_question_index, max_query_num);
                     // LOG_INF("Using question from file: %s\n", buffer.c_str());
                     LOG("%s\n", tmp.c_str());
-                    
+
                     // Record the begining time of inference for a new question
                     inference_start_time = std::chrono::steady_clock::now();
                     inference_started = true;
@@ -1168,6 +1370,13 @@ int main(int argc, char ** argv) {
             is_interacting = true;
         }
     }
+    
+    #if IGNITE_USE_SYSTEM_DVFS
+    sigterm = true;
+    record_thread.join();
+    #endif
+
+    reset_dvfs();
 
     if (!path_session.empty() && params.prompt_cache_all && !params.prompt_cache_ro) {
         LOG("\n%s: saving final output to session file '%s'\n", __func__, path_session.c_str());

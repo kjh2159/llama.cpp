@@ -341,6 +341,74 @@ extern "C" {
     GGML_API void                 ggml_backend_sched_set_eval_callback(ggml_backend_sched_t sched, ggml_backend_sched_eval_callback callback, void * user_data);
 
     //
+    // Backend scheduler profiling (lightweight)
+    //
+    // Notes:
+    // - This is intended for coarse per-backend and per-phase (prefill/decode) stats.
+    // - Timing buckets combine scheduler-side wall-time with caller-reported
+    //   build/sampling/process-CPU contributions.
+    // - The implementation is currently process-global and not thread-safe.
+    //
+
+    enum ggml_backend_sched_profile_phase {
+        GGML_BACKEND_SCHED_PROFILE_PREFILL = 0,
+        GGML_BACKEND_SCHED_PROFILE_DECODE  = 1,
+    };
+
+    struct ggml_backend_sched_profile_data {
+        // Unique layer ids observed for ops executed on each backend bucket.
+        // A layer may be counted in both CPU and HTP if ops for that layer ran on both.
+        uint32_t prefill_cpu_layers;
+        uint32_t prefill_htp_layers;
+        double   prefill_cpu_ms;
+        double   prefill_htp_ms;
+
+        uint32_t decode_cpu_layers;
+        uint32_t decode_htp_layers;
+        double   decode_cpu_ms;
+        double   decode_htp_ms;
+
+        // Operation counts (ggml graph nodes computed).
+        uint64_t total_ops;
+        uint64_t prefill_cpu_ops;
+        uint64_t decode_cpu_ops;
+        uint64_t prefill_htp_ops;
+        uint64_t decode_htp_ops;
+
+        // Operation counts by ggml op type.
+        // Indexed by enum ggml_op, see GGML_OP_* / GGML_OP_COUNT.
+        uint64_t prefill_cpu_ops_by_type[GGML_OP_COUNT];
+        uint64_t decode_cpu_ops_by_type[GGML_OP_COUNT];
+        uint64_t prefill_htp_ops_by_type[GGML_OP_COUNT];
+        uint64_t decode_htp_ops_by_type[GGML_OP_COUNT];
+
+        // Overhead breakdown (wall-time, ms)
+        double   prefill_copy_ms;
+        double   prefill_wait_ms;
+        double   prefill_build_ms;
+        double   prefill_sampling_ms;
+
+        double   decode_copy_ms;
+        double   decode_wait_ms;
+        double   decode_build_ms;
+        double   decode_sampling_ms;
+
+    };
+
+    // Enables/disables process-global backend scheduler profiling.
+    GGML_API void ggml_backend_sched_profile_set_enabled(bool enabled);
+    // Clears all accumulated profiling state and resets the active phase to prefill.
+    GGML_API void ggml_backend_sched_profile_reset(void);
+    // Selects which phase subsequent scheduler/caller-reported metrics are charged to.
+    GGML_API void ggml_backend_sched_profile_set_phase(enum ggml_backend_sched_profile_phase phase);
+    // Adds caller-reported graph build time (ms) for the active phase.
+    GGML_API void ggml_backend_sched_profile_add_build_ms(double build_ms);
+    // Adds caller-reported sampling time (ms) for the active phase.
+    GGML_API void ggml_backend_sched_profile_add_sampling_ms(double sampling_ms);
+    // Returns a snapshot of the accumulated profiling counters.
+    GGML_API struct ggml_backend_sched_profile_data ggml_backend_sched_profile_get(void);
+
+    //
     // Utils
     //
 
